@@ -85,7 +85,7 @@
 <body>
   <div class="container">
     <header>
-      <h1>Phia Group Policy Analyzer</h1>
+      <h1>Stop-Loss Policy Analyzerbot 5000 (beta)</h1>
       <div class="subtitle">v15.3b | Reference updates</div>
     </header>
 
@@ -165,7 +165,7 @@
       requiredAny: ["effective", "expir", "policy"],
       type: "Info",
       badge: "b-info",
-      analysis: "The policy term controls what stop-loss will reimburse, and it can be narrower than the plan’s practical claim cycle. Timing rules usually key off incurred and/or paid dates, and those dates do not always line up neatly with how providers bill or how administrators cut checks. Large claims that straddle year-end, late bills, and operational delays are where this becomes real money. If the plan pays a claim that falls outside the policy’s timing window, the plan can be left carrying the full cost with no reimbursement."
+      analysis: "The policy term controls what stop-loss will reimburse, and it can be narrower than the planâ€™s practical claim cycle. Timing rules usually key off incurred and/or paid dates, and those dates do not always line up neatly with how providers bill or how administrators cut checks. Large claims that straddle year-end, late bills, and operational delays are where this becomes real money. If the plan pays a claim that falls outside the policyâ€™s timing window, the plan can be left carrying the full cost with no reimbursement."
     },
     {
       id: "BENEFIT_PERIOD",
@@ -175,7 +175,7 @@
       requiredAny: ["incurred", "paid", "through", "benefit period"],
       type: "Financial / Timing Risk",
       badge: "b-soft",
-      analysis: "If the policy defines a separate ‘benefit period’ or coverage period for expenses, confirm how it interacts with the plan’s eligibility and coverage rules. Some policies effectively treat coverage as a snapshot rather than a living set of terms, and they can apply special timing rules to continuing courses of treatment. When a high-cost claimant has services that begin before the effective date or continue after termination, benefit-period mechanics are a common place for carriers to draw the line. Even where the plan’s coverage is continuous, the policy can still impose its own boundaries for reimbursement."
+      analysis: "If the policy defines a separate â€˜benefit periodâ€™ or coverage period for expenses, confirm how it interacts with the planâ€™s eligibility and coverage rules. Some policies effectively treat coverage as a snapshot rather than a living set of terms, and they can apply special timing rules to continuing courses of treatment. When a high-cost claimant has services that begin before the effective date or continue after termination, benefit-period mechanics are a common place for carriers to draw the line. Even where the planâ€™s coverage is continuous, the policy can still impose its own boundaries for reimbursement."
     },
     {
       id: "SPEC_DED",
@@ -184,7 +184,7 @@
       regex: /\b(specific deductible|deductible per covered person|claim limit per covered person|aggregate attachment point)\b/ig,
       type: "Info",
       badge: "b-info",
-      analysis: "Specific deductible language is not just a number. Policies often specify exactly what counts toward it (paid claims only, allowable expenses only, exclusions for certain charges, offsets from recoveries), and they may require proof-of-loss documentation in a particular format. If the plan assumes ‘we hit the deductible so we get reimbursed,’ that can be disappointed by technical limitations that reduce the amount the carrier credits toward the deductible."
+      analysis: "Specific deductible language is not just a number. Policies often specify exactly what counts toward it (paid claims only, allowable expenses only, exclusions for certain charges, offsets from recoveries), and they may require proof-of-loss documentation in a particular format. If the plan assumes â€˜we hit the deductible so we get reimbursed,â€™ that can be disappointed by technical limitations that reduce the amount the carrier credits toward the deductible."
     },
 
     // --- DEFINITIONS ---
@@ -195,7 +195,7 @@
       regex: /\b(experimental|investigational|investigative|off-label|unproven)\b/ig,
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Policies frequently define Experimental/Investigational services on their own terms, and the carrier’s definition may be stricter than the plan’s. This matters most for high-dollar areas where medicine moves faster than policy forms, including gene therapies, cellular therapies, emerging devices, and off-label drug use. If the plan covers something intentionally but the policy classifies it as experimental or unproven, reimbursement can be denied even if the plan’s payment was reasonable and consistent with the plan document."
+      analysis: "Policies frequently define Experimental/Investigational services on their own terms, and the carrierâ€™s definition may be stricter than the planâ€™s. This matters most for high-dollar areas where medicine moves faster than policy forms, including gene therapies, cellular therapies, emerging devices, and off-label drug use. If the plan covers something intentionally but the policy classifies it as experimental or unproven, reimbursement can be denied even if the planâ€™s payment was reasonable and consistent with the plan document."
     },
     {
       id: "PLAN_AMEND_APPROVAL",
@@ -206,7 +206,7 @@
       forbiddenAny: ["third party administrator", "tpa", "administrator change", "material changes to the designated"],
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Language requiring carrier approval of plan amendments creates a direct reimbursement risk because it can separate what the plan is legally or operationally required to do from what the carrier recognizes for reimbursement. Plans make amendments for compliance, administration, and design changes. If the plan pays under an updated term before the carrier has accepted that change in writing (or if the policy treats the plan as “frozen” as of a particular date), the carrier can deny reimbursement on the basis that the payment was not made under the recognized plan terms. That mismatch is where hard gaps are born: the plan pays because it must, but stop-loss declines because it views the amendment as outside the insured arrangement."
+      analysis: "Language requiring carrier approval of plan amendments creates a direct reimbursement risk because it can separate what the plan is legally or operationally required to do from what the carrier recognizes for reimbursement. Plans make amendments for compliance, administration, and design changes. If the plan pays under an updated term before the carrier has accepted that change in writing (or if the policy treats the plan as â€œfrozenâ€ as of a particular date), the carrier can deny reimbursement on the basis that the payment was not made under the recognized plan terms. That mismatch is where hard gaps are born: the plan pays because it must, but stop-loss declines because it views the amendment as outside the insured arrangement."
     },
     {
       id: "POLICY_PREVAILS",
@@ -224,7 +224,7 @@
       regex: /\b(usual and customary|reasonable and customary|usual and reasonable|prevailing charge|maximum allowable|usual and reasonable charges)\b/ig,
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Usual and Customary, Reasonable Charge, or similar ‘allowable’ limitations are a common source of hard gaps. They matter most where the plan uses network pricing, reference-based pricing, settlements, or other payment methodologies that do not mirror the carrier’s internal benchmarks. If the plan pays an amount that is higher than what the carrier considers reasonable, the carrier may reimburse only up to its benchmark and treat the rest as non-reimbursable. That gap lands on the plan."
+      analysis: "Usual and Customary, Reasonable Charge, or similar â€˜allowableâ€™ limitations are a common source of hard gaps. They matter most where the plan uses network pricing, reference-based pricing, settlements, or other payment methodologies that do not mirror the carrierâ€™s internal benchmarks. If the plan pays an amount that is higher than what the carrier considers reasonable, the carrier may reimburse only up to its benchmark and treat the rest as non-reimbursable. That gap lands on the plan."
     },
     {
       id: "INCURRED_DEF",
@@ -234,7 +234,7 @@
       requiredAny: ["means", "shall mean", "date on which", "rendered", "received"],
       type: "Soft Gap",
       badge: "b-soft",
-      analysis: "How the policy defines ‘incurred’ can change which policy period a claim falls into. This comes up in continuing treatment, inpatient stays crossing term dates, and billing practices where providers bundle or delay charges. If incurred is defined narrowly (for example, strictly the date of service), then services around the start or end of the policy period can fall into run-in/run-out disputes even when the plan’s coverage is continuous."
+      analysis: "How the policy defines â€˜incurredâ€™ can change which policy period a claim falls into. This comes up in continuing treatment, inpatient stays crossing term dates, and billing practices where providers bundle or delay charges. If incurred is defined narrowly (for example, strictly the date of service), then services around the start or end of the policy period can fall into run-in/run-out disputes even when the planâ€™s coverage is continuous."
     },
     {
       id: "PAID_DEF",
@@ -244,7 +244,7 @@
       requiredAny: ["deemed", "mailed", "check", "draft", "clearinghouse", "payment instructions", "disbursed"],
       type: "Soft Gap",
       badge: "b-soft",
-      analysis: "Definitions of ‘paid’ can be more technical than people expect. Some policies tie paid to a check being issued, mailed, or cleared, rather than when the plan funds the claim through its administrator or clearinghouse. In practice, a claim can be approved and funded on time but still be treated as ‘paid’ outside the policy window because of processing timing. That is an operational timing gap, not a merits issue, but it can still drive a denial."
+      analysis: "Definitions of â€˜paidâ€™ can be more technical than people expect. Some policies tie paid to a check being issued, mailed, or cleared, rather than when the plan funds the claim through its administrator or clearinghouse. In practice, a claim can be approved and funded on time but still be treated as â€˜paidâ€™ outside the policy window because of processing timing. That is an operational timing gap, not a merits issue, but it can still drive a denial."
     },
     {
       id: "MED_NECESSITY",
@@ -274,7 +274,7 @@
       requiredAny: ["medicare", "primary", "secondary", "coordina", "msp", "eligible for medicare", "entitled to medicare"],
       type: "Compliance Risk",
       badge: "b-soft",
-      analysis: "Medicare coordination provisions need careful reading because the trigger language matters. Some forms use “eligible for Medicare” loosely, even though coordination rules in the real world often turn on entitlement, enrollment, and MSP status. If the policy pushes expenses into a Medicare-secondary posture in situations where the plan expects to pay primary (for example, certain active-employee contexts), it can create both compliance pressure and reimbursement disputes. The point is alignment: if the plan and the carrier are using different coordination triggers, the plan can pay a claim that the carrier later treats as overpaid or non-reimbursable."
+      analysis: "Medicare coordination provisions need careful reading because the trigger language matters. Some forms use â€œeligible for Medicareâ€ loosely, even though coordination rules in the real world often turn on entitlement, enrollment, and MSP status. If the policy pushes expenses into a Medicare-secondary posture in situations where the plan expects to pay primary (for example, certain active-employee contexts), it can create both compliance pressure and reimbursement disputes. The point is alignment: if the plan and the carrier are using different coordination triggers, the plan can pay a claim that the carrier later treats as overpaid or non-reimbursable."
     },
 
     // --- EXCLUSIONS / LIMITATIONS ---
@@ -285,7 +285,7 @@
       regex: new RegExp(`\\b(${R.law})\\b`, "ig"),
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Illegal acts exclusions vary in scope and can be broader than a plan expects. The key practical question is whether the exclusion requires a conviction or whether the carrier can apply it based on an allegation or the carrier’s own view of the facts. If the policy sweeps in misdemeanors or vague unlawful conduct, the carrier can deny reimbursement in situations where the plan might otherwise pay under its plan terms."
+      analysis: "Illegal acts exclusions vary in scope and can be broader than a plan expects. The key practical question is whether the exclusion requires a conviction or whether the carrier can apply it based on an allegation or the carrierâ€™s own view of the facts. If the policy sweeps in misdemeanors or vague unlawful conduct, the carrier can deny reimbursement in situations where the plan might otherwise pay under its plan terms."
     },
     {
       id: "OUTSIDE_CONTRACT",
@@ -294,7 +294,7 @@
       regex: /\b(liability.*assum(e|ed).*contract|assum(e|ed).*liability.*contract|liability.*contract.*other than the plan)\b/ig,
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Exclusions for liabilities assumed under contracts other than the plan can be a problem in network contexts. Network and vendor agreements often impose payment obligations that are not spelled out in the plan document itself. If the carrier treats those obligations as ‘assumed liability,’ it may refuse to reimburse amounts attributable to those contracts, particularly where payments exceed the carrier’s own allowable-charge limits."
+      analysis: "Exclusions for liabilities assumed under contracts other than the plan can be a problem in network contexts. Network and vendor agreements often impose payment obligations that are not spelled out in the plan document itself. If the carrier treats those obligations as â€˜assumed liability,â€™ it may refuse to reimburse amounts attributable to those contracts, particularly where payments exceed the carrierâ€™s own allowable-charge limits."
     },
     {
       id: "PAYABLE_OTHER_SOURCE",
@@ -303,7 +303,7 @@
       regex: /\b(payment may be made by another insurer|any other party|irrespective of.*whether.*payment has actually been made|other insurance)\b/ig,
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Provisions that reduce reimbursement for amounts payable from other sources can be interpreted narrowly (traditional coordination) or aggressively (including what could have been recovered through subrogation). The aggressive interpretation is where a plan can lose money based on hypothetical recoveries rather than actual recoveries. If the carrier uses ‘recoverable’ instead of ‘recovered’ concepts, it can create offsets that the plan did not actually realize."
+      analysis: "Provisions that reduce reimbursement for amounts payable from other sources can be interpreted narrowly (traditional coordination) or aggressively (including what could have been recovered through subrogation). The aggressive interpretation is where a plan can lose money based on hypothetical recoveries rather than actual recoveries. If the carrier uses â€˜recoverableâ€™ instead of â€˜recoveredâ€™ concepts, it can create offsets that the plan did not actually realize."
     },
     {
       id: "WAR_RIOT",
@@ -313,17 +313,17 @@
       forbiddenAny: ["award", "forward", "towards"],
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "War, riot, or terrorism exclusions are often drafted broadly and may not mirror the plan’s own limitations. Even if these scenarios are rare, the financial impact can be extreme because they often involve catastrophic injuries. If the plan pays but the policy excludes, the result is a straightforward reimbursement gap."
+      analysis: "War, riot, or terrorism exclusions are often drafted broadly and may not mirror the planâ€™s own limitations. Even if these scenarios are rare, the financial impact can be extreme because they often involve catastrophic injuries. If the plan pays but the policy excludes, the result is a straightforward reimbursement gap."
     },
     {
       id: "WORKERS_COMP",
       category: CAT_EXC,
-      title: "Workers’ Compensation / Work-Related Injury (Entitled-to Language)",
+      title: "Workersâ€™ Compensation / Work-Related Injury (Entitled-to Language)",
       regex: new RegExp(`\\b(${R.work})\\b`, "ig"),
       requiredAny: ["entitled", "eligible", "available", "whether or not"],
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Workers’ compensation language is a frequent trap when it is written in ‘entitled to’ terms. Some policies treat claims as excluded if workers’ compensation could have applied, even if no claim was filed or the workers’ compensation carrier denied liability. If the plan’s exclusion is narrower or applied differently, the plan can end up paying claims the stop-loss carrier will not reimburse."
+      analysis: "Workersâ€™ compensation language is a frequent trap when it is written in â€˜entitled toâ€™ terms. Some policies treat claims as excluded if workersâ€™ compensation could have applied, even if no claim was filed or the workersâ€™ compensation carrier denied liability. If the planâ€™s exclusion is narrower or applied differently, the plan can end up paying claims the stop-loss carrier will not reimburse."
     },
     {
       id: "FAMILY_PROV",
@@ -333,7 +333,7 @@
       requiredAny: ["provider", "service", "rendered", "treatment"],
       type: "Soft Gap",
       badge: "b-soft",
-      analysis: "Family-provider exclusions are usually aimed at fraud and related-party billing, but the scope varies. Some policies define family broadly, and they may exclude services even when clinically appropriate (for example, certain home care arrangements). If the plan document’s exclusion is narrower than the policy’s, reimbursement can be denied for services the plan otherwise covers."
+      analysis: "Family-provider exclusions are usually aimed at fraud and related-party billing, but the scope varies. Some policies define family broadly, and they may exclude services even when clinically appropriate (for example, certain home care arrangements). If the plan documentâ€™s exclusion is narrower than the policyâ€™s, reimbursement can be denied for services the plan otherwise covers."
     },
     {
       id: "LOST_DISCOUNT",
@@ -354,7 +354,7 @@
       regex: /\b(sole authority|sole discretion|final authority|we shall have the sole authority|we reserve the right)\b/ig,
       type: "Admin / Reimbursement Risk",
       badge: "b-hard",
-      analysis: "Carrier discretion clauses are the engine behind many soft gaps. Even where plan language appears aligned, the carrier reserves final authority to interpret terms and decide what qualifies as a reimbursable expense. In a dispute, the plan may be arguing about coverage under the plan, while the carrier is applying the stop-loss contract’s interpretation and definitions."
+      analysis: "Carrier discretion clauses are the engine behind many soft gaps. Even where plan language appears aligned, the carrier reserves final authority to interpret terms and decide what qualifies as a reimbursable expense. In a dispute, the plan may be arguing about coverage under the plan, while the carrier is applying the stop-loss contractâ€™s interpretation and definitions."
     },
     {
       id: "NOTICE_CLAIM",
@@ -374,7 +374,7 @@
       requiredAny: ["90", "days", "requested", "deny", "reduce"],
       type: "Admin Burden",
       badge: "b-soft",
-      analysis: "Proof of loss requirements control the documentation and timing for reimbursement submissions. Even when a claim is clearly reimbursable, carriers can delay or deny if the submission is late or incomplete under the policy’s definition of satisfactory proof. This is an operational risk because it depends on process discipline, not on the merits of the underlying claim."
+      analysis: "Proof of loss requirements control the documentation and timing for reimbursement submissions. Even when a claim is clearly reimbursable, carriers can delay or deny if the submission is late or incomplete under the policyâ€™s definition of satisfactory proof. This is an operational risk because it depends on process discipline, not on the merits of the underlying claim."
     },
     {
       id: "CLAIM_ORDER",
@@ -383,7 +383,7 @@
       regex: /\b(process(ed|ing) .*outside of the order|usual and customary cycle|order in which it was received)\b/ig,
       type: "Hard Gap",
       badge: "b-hard",
-      analysis: "Order-of-payment and claim handling provisions can matter where multiple coverage layers exist or where claims are adjusted after initial payment. Policies sometimes specify the sequence in which amounts are credited toward deductibles and reimbursed. If the policy’s sequencing differs from the plan’s administration assumptions, it can create reconciliation issues and timing disputes for reimbursements."
+      analysis: "Order-of-payment and claim handling provisions can matter where multiple coverage layers exist or where claims are adjusted after initial payment. Policies sometimes specify the sequence in which amounts are credited toward deductibles and reimbursed. If the policyâ€™s sequencing differs from the planâ€™s administration assumptions, it can create reconciliation issues and timing disputes for reimbursements."
     },
     {
       id: "SUBRO",
@@ -681,29 +681,29 @@
   // SECTION 5: EXPORT (Clipboard & Word)
   // ------------------------------------------------------------------------
 
-  // CHANGED: normalize common mojibake sequences so Word export doesn't show â€™ / â€œ / etc.
+  // CHANGED: normalize common mojibake sequences so Word export doesn't show Ã¢â‚¬â„¢ / Ã¢â‚¬Å“ / etc.
   function normalizeText(s){
     if(s === null || s === undefined) return "";
     let t = String(s);
 
-    // Strip common stray "Â" (non-breaking space artifacts)
+    // Strip common stray "Ã‚" (non-breaking space artifacts)
     t = t.replace(/\u00C2/g, "");
 
     // Common mojibake -> proper punctuation
     t = t
-      .replace(/â€™/g, "’")
-      .replace(/â€˜/g, "‘")
-      .replace(/â€œ/g, "“")
-      .replace(/â€/g, "”")
-      .replace(/â€“/g, "–")
-      .replace(/â€”/g, "—")
-      .replace(/â€¦/g, "…")
-      .replace(/â€¢/g, "•")
-      .replace(/â€/g, "”")
-      .replace(/â€/g, "")
-      .replace(/â€/g, "-")
-      .replace(/â€/g, "")
-      .replace(/â€‹/g, "");
+      .replace(/Ã¢â‚¬â„¢/g, "â€™")
+      .replace(/Ã¢â‚¬Ëœ/g, "â€˜")
+      .replace(/Ã¢â‚¬Å“/g, "â€œ")
+      .replace(/Ã¢â‚¬/g, "â€")
+      .replace(/Ã¢â‚¬â€œ/g, "â€“")
+      .replace(/Ã¢â‚¬â€/g, "â€”")
+      .replace(/Ã¢â‚¬Â¦/g, "â€¦")
+      .replace(/Ã¢â‚¬Â¢/g, "â€¢")
+      .replace(/Ã¢â‚¬Â/g, "â€")
+      .replace(/Ã¢â‚¬Â/g, "")
+      .replace(/Ã¢â‚¬/g, "-")
+      .replace(/Ã¢â‚¬Â/g, "")
+      .replace(/Ã¢â‚¬â€¹/g, "");
 
     // Last-resort cleanup for occasional replacement-char sequences
     t = t.replace(/\uFFFD/g, "");
