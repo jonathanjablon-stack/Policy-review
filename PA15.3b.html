@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stop-Loss Policy Reviewerbot 5000</title>
+
+  <!-- Core libs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+  <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <style>
+    :root{
+      --phia-blue:#0056b3;
+      --bg-gray:#f4f7f6;
+      --border:#ccc;
+      --risk-high:#dc3545;
+      --risk-med:#ffc107;
+      --risk-info:#17a2b8;
+    }
+
+    body{font-family:'Segoe UI', Helvetica, sans-serif;background:var(--bg-gray);color:#333;padding:30px;}
+    .container{max-width:1200px;margin:0 auto;background:#fff;padding:40px;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.08);}
+    h1{color:var(--phia-blue);margin-top:0;border-bottom:3px solid var(--phia-blue);padding-bottom:10px;}
+    .subtitle{color:#666;font-style:italic;margin-bottom:25px;}
+
+    .controls{
+      background:#eef2f5;
+      padding:20px;
+      border-radius:6px;
+      border:1px solid #b0bec5;
+      margin-bottom:20px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:15px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .file-group{flex-grow:1;display:flex;flex-direction:column;}
+    .file-group label{font-weight:bold;margin-bottom:5px;font-size:0.9em;}
+
+    button{
+      background:var(--phia-blue);
+      color:#fff;border:none;
+      padding:12px 24px;border-radius:4px;
+      font-weight:600;cursor:pointer;
+      transition:0.2s;white-space:nowrap;
+    }
+    button:hover{background:#003d80;}
+    button.secondary{background:#546e7a;}
+    button.secondary:hover{background:#37474f;}
+
+    .results-section{display:none;margin-top:30px;}
+    .export-bar{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:15px;flex-wrap:wrap;}
+    .export-format{display:flex;align-items:center;gap:10px;padding:6px 10px;background:#eef2f5;border:1px solid #b0bec5;border-radius:4px;}
+    .export-format label{display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#333;}
+    .export-format-label{font-weight:600;font-size:0.85rem;color:#333;}
+
+    table{width:100%;border-collapse:collapse;font-size:0.9rem;border:1px solid var(--border);table-layout:fixed;}
+    th{background:#343a40;color:#fff;padding:12px;text-align:left;}
+    td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top;word-wrap:break-word;overflow-wrap:anywhere;}
+    tr:nth-child(even){background:#fcfcfc;}
+
+    .badge{
+      display:inline-block;
+      padding:4px 8px;border-radius:4px;
+      color:#fff;font-weight:bold;
+      font-size:0.75rem;text-transform:uppercase;
+      white-space:nowrap;margin-bottom:5px;
+    }
+    .b-hard{background:var(--risk-high);}
+    .b-soft{background:var(--risk-med);color:#333;}
+    .b-info{background:var(--risk-info);}
+
+    mark{background:#fff59d;padding:2px 4px;border-radius:2px;border-bottom:2px solid #fbc02d;font-weight:bold;}
+
+    .offline-box{display:none;margin-top:20px;padding:15px;background:#fff3cd;border:1px solid #ffeeba;border-radius:4px;}
+    textarea{width:100%;height:120px;padding:10px;margin-top:10px;border:1px solid #ccc;font-family:monospace;}
+    .small-note{font-size:0.85em;color:#666;margin-top:6px;}
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>Phia Group Policy Analyzer</h1>
+      <div class="subtitle">v15.3b | Reference updates</div>
+    </header>
+
+    <div class="controls">
+      <div class="file-group">
+        <label>Upload Policy File (.pdf / .docx):</label>
+        <input type="file" id="fileInput" accept=".pdf,.docx">
+        <div class="small-note">Default mode is comprehensive. This will flag everything the rules engine recognizes.</div>
+      </div>
+      <button onclick="processFile()">Analyze Policy</button>
+    </div>
+
+    <div id="offlineFallback" class="offline-box">
+      <b>Offline Mode:</b> Libraries failed to load. Paste policy text manually below:
+      <textarea id="manualText" placeholder="Paste full policy text here..."></textarea>
+      <button onclick="processManual()">Analyze Text</button>
+    </div>
+
+    <div id="resultsArea" class="results-section">
+      <div class="export-bar">
+        <div class="export-format" title="Choose the Word export layout">
+          <span class="export-format-label">Word format:</span>
+          <label><input type="radio" name="exportFormat" value="table" checked> Table</label>
+          <label><input type="radio" name="exportFormat" value="memo"> Memo</label>
+        </div>
+        <!-- CHANGED: fixed mojibake button labels -->
+        <button class="secondary" onclick="copyPipeText()"> Copy Data</button>
+        <button class="secondary" onclick="exportToWord()"> Export Word Review</button>
+      </div>
+
+      <h3>Review Findings (<span id="countDisplay">0</span> unique issues)</h3>
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th width="22%">Issue Category</th>
+            <th width="38%">Policy Language</th>
+            <th width="40%">Phia Analysis</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+  // ------------------------------------------------------------------------
+  // SECTION 1: RULES ENGINE (generic; designed to work across carriers)
+  // ------------------------------------------------------------------------
+
+  const CAT_KEY = "KEY TERMS / SCHEDULE";
+  const CAT_DEF = "DEFINITIONS";
+  const CAT_EXC = "EXCLUSIONS / LIMITATIONS";
+  const CAT_GEN = "CLAIMS / ADMIN / GENERAL";
+  const CAT_MISSING = "MISSING PROVISIONS";
+
+  // Root-ish helpers (avoid false positives)
+  const R = {
+    rate: "rate|pricing|price|cost|charge|fee|allowable|payment|reimburs",
+    medicare: "medicare|cms",
+    coord: "coordinat|primary|secondary|msp|entitled|eligible",
+    law: "illegal|felony|misdemeanor|criminal|unlawful|crime",
+    drug: "alcohol|drug|intoxica|substance|influence",
+    work: "worker|workers|occupation|employment|job|work[- ]related|workers'?\\s*comp|compensation",
+  };
+
+  // Matching controls:
+  // - requiredAny: at least one token must appear in the match window
+  // - requiredAll: all tokens must appear in the match window
+  // - forbiddenAny: if any token appears in the match window, the match is discarded
+  const RULES = [
+    // --- KEY TERMS / SCHEDULE ---
+    {
+      id: "TERM_DATES",
+      category: CAT_KEY,
+      title: "Policy Term (Effective / Expiration)",
+      regex: /\b(policy effective date|effective date|expiration date|policy period|inception date)\b/ig,
+      requiredAny: ["effective", "expir", "policy"],
+      type: "Info",
+      badge: "b-info",
+      analysis: "The policy term controls what stop-loss will reimburse, and it can be narrower than the plan’s practical claim cycle. Timing rules usually key off incurred and/or paid dates, and those dates do not always line up neatly with how providers bill or how administrators cut checks. Large claims that straddle year-end, late bills, and operational delays are where this becomes real money. If the plan pays a claim that falls outside the policy’s timing window, the plan can be left carrying the full cost with no reimbursement."
+    },
+    {
+      id: "BENEFIT_PERIOD",
+      category: CAT_KEY,
+      title: "Claim Basis / Benefit Period (Run-In / Run-Out)",
+      regex: /\b(eligible expenses incurred\s+from|eligible expenses paid\s+from|benefit period)\b/ig,
+      requiredAny: ["incurred", "paid", "through", "benefit period"],
+      type: "Financial / Timing Risk",
+      badge: "b-soft",
+      analysis: "If the policy defines a separate ‘benefit period’ or coverage period for expenses, confirm how it interacts with the plan’s eligibility and coverage rules. Some policies effectively treat coverage as a snapshot rather than a living set of terms, and they can apply special timing rules to continuing courses of treatment. When a high-cost claimant has services that begin before the effective date or continue after termination, benefit-period mechanics are a common place for carriers to draw the line. Even where the plan’s coverage is continuous, the policy can still impose its own boundaries for reimbursement."
+    },
+    {
+      id: "SPEC_DED",
+      category: CAT_KEY,
+      title: "Specific Deductible / Claim Thresholds",
+      regex: /\b(specific deductible|deductible per covered person|claim limit per covered person|aggregate attachment point)\b/ig,
+      type: "Info",
+      badge: "b-info",
+      analysis: "Specific deductible language is not just a number. Policies often specify exactly what counts toward it (paid claims only, allowable expenses only, exclusions for certain charges, offsets from recoveries), and they may require proof-of-loss documentation in a particular format. If the plan assumes ‘we hit the deductible so we get reimbursed,’ that can be disappointed by technical limitations that reduce the amount the carrier credits toward the deductible."
+    },
+
+    // --- DEFINITIONS ---
+    {
+      id: "EXPERIMENTAL",
+      category: CAT_DEF,
+      title: "Experimental / Investigational / Unproven",
+      regex: /\b(experimental|investigational|investigative|off-label|unproven)\b/ig,
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Policies frequently define Experimental/Investigational services on their own terms, and the carrier’s definition may be stricter than the plan’s. This matters most for high-dollar areas where medicine moves faster than policy forms, including gene therapies, cellular therapies, emerging devices, and off-label drug use. If the plan covers something intentionally but the policy classifies it as experimental or unproven, reimbursement can be denied even if the plan’s payment was reasonable and consistent with the plan document."
+    },
+    {
+      id: "PLAN_AMEND_APPROVAL",
+      category: CAT_DEF,
+      title: "Plan Amendments Require Carrier Approval",
+      regex: /\b(plan (document )?amendment|amendment(s)? to (the )?plan|amend(ed|ment)\b.*\b(plan|plan document)\b|no amendment to (the )?plan|no change in (the )?plan|plan (document )?changes?)\b/ig,
+      requiredAny: ["plan", "approval", "approved", "amend", "change"],
+      forbiddenAny: ["third party administrator", "tpa", "administrator change", "material changes to the designated"],
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Language requiring carrier approval of plan amendments creates a direct reimbursement risk because it can separate what the plan is legally or operationally required to do from what the carrier recognizes for reimbursement. Plans make amendments for compliance, administration, and design changes. If the plan pays under an updated term before the carrier has accepted that change in writing (or if the policy treats the plan as “frozen” as of a particular date), the carrier can deny reimbursement on the basis that the payment was not made under the recognized plan terms. That mismatch is where hard gaps are born: the plan pays because it must, but stop-loss declines because it views the amendment as outside the insured arrangement."
+    },
+    {
+      id: "POLICY_PREVAILS",
+      category: CAT_DEF,
+      title: "Policy Controls if Plan Conflicts",
+      regex: /\b(in case of a conflict between the plan and (this )?policy|this policy will prevail)\b/ig,
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "When the policy states that it controls in the event of a conflict, the carrier is signaling that reimbursement is driven by the stop-loss contract, not by plan intent. Even where the plan document is clear, the carrier may apply its own definitions and limitations for what counts as a covered expense under stop-loss. This clause tends to show up in disputes where the plan believes it did the right thing and the carrier responds that the stop-loss contract is simply different."
+    },
+    {
+      id: "UC_LIMITS",
+      category: CAT_DEF,
+      title: "Usual & Customary / Reasonable Charge Limitation",
+      regex: /\b(usual and customary|reasonable and customary|usual and reasonable|prevailing charge|maximum allowable|usual and reasonable charges)\b/ig,
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Usual and Customary, Reasonable Charge, or similar ‘allowable’ limitations are a common source of hard gaps. They matter most where the plan uses network pricing, reference-based pricing, settlements, or other payment methodologies that do not mirror the carrier’s internal benchmarks. If the plan pays an amount that is higher than what the carrier considers reasonable, the carrier may reimburse only up to its benchmark and treat the rest as non-reimbursable. That gap lands on the plan."
+    },
+    {
+      id: "INCURRED_DEF",
+      category: CAT_DEF,
+      title: "Definition: Incurred",
+      regex: /\bincurred\b/ig,
+      requiredAny: ["means", "shall mean", "date on which", "rendered", "received"],
+      type: "Soft Gap",
+      badge: "b-soft",
+      analysis: "How the policy defines ‘incurred’ can change which policy period a claim falls into. This comes up in continuing treatment, inpatient stays crossing term dates, and billing practices where providers bundle or delay charges. If incurred is defined narrowly (for example, strictly the date of service), then services around the start or end of the policy period can fall into run-in/run-out disputes even when the plan’s coverage is continuous."
+    },
+    {
+      id: "PAID_DEF",
+      category: CAT_DEF,
+      title: "Definition: Paid (Clearinghouse / Funding Timing)",
+      regex: /\bpaid\b/ig,
+      requiredAny: ["deemed", "mailed", "check", "draft", "clearinghouse", "payment instructions", "disbursed"],
+      type: "Soft Gap",
+      badge: "b-soft",
+      analysis: "Definitions of ‘paid’ can be more technical than people expect. Some policies tie paid to a check being issued, mailed, or cleared, rather than when the plan funds the claim through its administrator or clearinghouse. In practice, a claim can be approved and funded on time but still be treated as ‘paid’ outside the policy window because of processing timing. That is an operational timing gap, not a merits issue, but it can still drive a denial."
+    },
+    {
+      id: "MED_NECESSITY",
+      category: CAT_DEF,
+      title: "Medical Necessity Definition / Carrier Discretion",
+      regex: /\b(medically necessary|medical necessity|necessary and appropriate)\b/ig,
+      requiredAny: ["we determine", "company retains", "sole", "discretion", "regardless of provider network"],
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "If the policy contains its own medical necessity definition or gives the carrier authority to determine medical necessity for reimbursement purposes, that creates a soft-gap risk. The plan administrator may determine a service is covered and medically necessary under the plan, but the carrier can disagree and reduce or deny reimbursement. This matters most on high-cost claims where the carrier applies stricter clinical criteria than the plan would apply."
+    },
+    {
+      id: "MEDICARE_RATES",
+      category: CAT_DEF,
+      title: "Medicare Benchmark / Reference Pricing",
+      regex: /\b(medicare)\b.{0,80}\b(%|percent|percentage|multiple|benchmark|fee schedule|based on|reference)\b|\b(%|percent|percentage|multiple|benchmark|fee schedule|based on|reference)\b.{0,80}\bmedicare\b/ig,
+      requiredAny: ["percent", "%", "multiple", "benchmark", "fee schedule", "based on", "reference"],
+      type: "Financial Risk",
+      badge: "b-soft",
+      analysis: "This type of clause ties allowable expenses to a Medicare-based benchmark (for example, a percentage or multiple of Medicare, or the Medicare fee schedule). When that structure is present, it can cap reimbursement even if the plan pays more under a network contract, a settlement, or another methodology. The practical risk is a true dollar gap: the plan pays in full, but stop-loss reimburses only up to the Medicare-based ceiling. This is a pricing limitation, not a question of medical necessity or eligibility."
+    },
+    {
+      id: "MEDICARE_COORD",
+      category: CAT_DEF,
+      title: "Medicare Coordination (Eligibility vs. Entitlement)",
+      regex: /\b(medicare)\b.{0,120}\b(primary|secondary|coordina|eligible for medicare|entitled to medicare|msp)\b|\b(primary|secondary|coordina|eligible for medicare|entitled to medicare|msp)\b.{0,120}\bmedicare\b/ig,
+      requiredAny: ["medicare", "primary", "secondary", "coordina", "msp", "eligible for medicare", "entitled to medicare"],
+      type: "Compliance Risk",
+      badge: "b-soft",
+      analysis: "Medicare coordination provisions need careful reading because the trigger language matters. Some forms use “eligible for Medicare” loosely, even though coordination rules in the real world often turn on entitlement, enrollment, and MSP status. If the policy pushes expenses into a Medicare-secondary posture in situations where the plan expects to pay primary (for example, certain active-employee contexts), it can create both compliance pressure and reimbursement disputes. The point is alignment: if the plan and the carrier are using different coordination triggers, the plan can pay a claim that the carrier later treats as overpaid or non-reimbursable."
+    },
+
+    // --- EXCLUSIONS / LIMITATIONS ---
+    {
+      id: "ILLEGAL_ACTS",
+      category: CAT_EXC,
+      title: "Illegal Acts / Felony Exclusion",
+      regex: new RegExp(`\\b(${R.law})\\b`, "ig"),
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Illegal acts exclusions vary in scope and can be broader than a plan expects. The key practical question is whether the exclusion requires a conviction or whether the carrier can apply it based on an allegation or the carrier’s own view of the facts. If the policy sweeps in misdemeanors or vague unlawful conduct, the carrier can deny reimbursement in situations where the plan might otherwise pay under its plan terms."
+    },
+    {
+      id: "OUTSIDE_CONTRACT",
+      category: CAT_EXC,
+      title: "Liability Assumed Under Contract (Network / PPO Risk)",
+      regex: /\b(liability.*assum(e|ed).*contract|assum(e|ed).*liability.*contract|liability.*contract.*other than the plan)\b/ig,
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Exclusions for liabilities assumed under contracts other than the plan can be a problem in network contexts. Network and vendor agreements often impose payment obligations that are not spelled out in the plan document itself. If the carrier treats those obligations as ‘assumed liability,’ it may refuse to reimburse amounts attributable to those contracts, particularly where payments exceed the carrier’s own allowable-charge limits."
+    },
+    {
+      id: "PAYABLE_OTHER_SOURCE",
+      category: CAT_EXC,
+      title: "Payable From Any Other Source (Recoverable vs. Recovered)",
+      regex: /\b(payment may be made by another insurer|any other party|irrespective of.*whether.*payment has actually been made|other insurance)\b/ig,
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Provisions that reduce reimbursement for amounts payable from other sources can be interpreted narrowly (traditional coordination) or aggressively (including what could have been recovered through subrogation). The aggressive interpretation is where a plan can lose money based on hypothetical recoveries rather than actual recoveries. If the carrier uses ‘recoverable’ instead of ‘recovered’ concepts, it can create offsets that the plan did not actually realize."
+    },
+    {
+      id: "WAR_RIOT",
+      category: CAT_EXC,
+      title: "War / Riot / Terrorism Exclusion",
+      regex: /\b(war|insurrection|riot|terrorism)\b/ig,
+      forbiddenAny: ["award", "forward", "towards"],
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "War, riot, or terrorism exclusions are often drafted broadly and may not mirror the plan’s own limitations. Even if these scenarios are rare, the financial impact can be extreme because they often involve catastrophic injuries. If the plan pays but the policy excludes, the result is a straightforward reimbursement gap."
+    },
+    {
+      id: "WORKERS_COMP",
+      category: CAT_EXC,
+      title: "Workers’ Compensation / Work-Related Injury (Entitled-to Language)",
+      regex: new RegExp(`\\b(${R.work})\\b`, "ig"),
+      requiredAny: ["entitled", "eligible", "available", "whether or not"],
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Workers’ compensation language is a frequent trap when it is written in ‘entitled to’ terms. Some policies treat claims as excluded if workers’ compensation could have applied, even if no claim was filed or the workers’ compensation carrier denied liability. If the plan’s exclusion is narrower or applied differently, the plan can end up paying claims the stop-loss carrier will not reimburse."
+    },
+    {
+      id: "FAMILY_PROV",
+      category: CAT_EXC,
+      title: "Family / Relative Provider Exclusion",
+      regex: /\b(family member|relative)\b/ig,
+      requiredAny: ["provider", "service", "rendered", "treatment"],
+      type: "Soft Gap",
+      badge: "b-soft",
+      analysis: "Family-provider exclusions are usually aimed at fraud and related-party billing, but the scope varies. Some policies define family broadly, and they may exclude services even when clinically appropriate (for example, certain home care arrangements). If the plan document’s exclusion is narrower than the policy’s, reimbursement can be denied for services the plan otherwise covers."
+    },
+    {
+      id: "LOST_DISCOUNT",
+      category: CAT_EXC,
+      title: "Lost Discounts (Untimely Payment)",
+      regex: /\b(discount|savings)\b/ig,
+      requiredAny: ["lost", "forfeited", "waived", "untimely", "timely payment"],
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Lost discount provisions can shift liability to the plan for administrative timing. If a provider discount is forfeited because payment was not timely, most policies treat the claim as if the discount had been taken and refuse to reimburse the lost savings. This can matter in disputes and negotiations where payment is intentionally delayed."
+    },
+
+    // --- CLAIMS / ADMIN / GENERAL ---
+    {
+      id: "DISCRETION",
+      category: CAT_GEN,
+      title: "Carrier Discretion / Final Authority to Interpret",
+      regex: /\b(sole authority|sole discretion|final authority|we shall have the sole authority|we reserve the right)\b/ig,
+      type: "Admin / Reimbursement Risk",
+      badge: "b-hard",
+      analysis: "Carrier discretion clauses are the engine behind many soft gaps. Even where plan language appears aligned, the carrier reserves final authority to interpret terms and decide what qualifies as a reimbursable expense. In a dispute, the plan may be arguing about coverage under the plan, while the carrier is applying the stop-loss contract’s interpretation and definitions."
+    },
+    {
+      id: "NOTICE_CLAIM",
+      category: CAT_GEN,
+      title: "Notice of Potential / Large Claim",
+      regex: /\b(notice of potential claim|potential claim|notify)\b/ig,
+      requiredAny: ["specific deductible", "50%", "thirty", "30", "days", "trigger"],
+      type: "Admin Burden",
+      badge: "b-soft",
+      analysis: "Notice requirements for large claims create a compliance-style administrative duty. Policies often require notice when a claim is reasonably expected to reach a percentage of the specific deductible. If notice is late, carriers sometimes assert technical defenses, and at minimum it can delay reimbursement while the carrier investigates."
+    },
+    {
+      id: "PROOF_OF_LOSS",
+      category: CAT_GEN,
+      title: "Proof of Loss Timing / Documentation Demands",
+      regex: /\b(proof of loss|supporting documents|required material)\b/ig,
+      requiredAny: ["90", "days", "requested", "deny", "reduce"],
+      type: "Admin Burden",
+      badge: "b-soft",
+      analysis: "Proof of loss requirements control the documentation and timing for reimbursement submissions. Even when a claim is clearly reimbursable, carriers can delay or deny if the submission is late or incomplete under the policy’s definition of satisfactory proof. This is an operational risk because it depends on process discipline, not on the merits of the underlying claim."
+    },
+    {
+      id: "CLAIM_ORDER",
+      category: CAT_GEN,
+      title: "Claim Processing Order / Cycle Restrictions",
+      regex: /\b(process(ed|ing) .*outside of the order|usual and customary cycle|order in which it was received)\b/ig,
+      type: "Hard Gap",
+      badge: "b-hard",
+      analysis: "Order-of-payment and claim handling provisions can matter where multiple coverage layers exist or where claims are adjusted after initial payment. Policies sometimes specify the sequence in which amounts are credited toward deductibles and reimbursed. If the policy’s sequencing differs from the plan’s administration assumptions, it can create reconciliation issues and timing disputes for reimbursements."
+    },
+    {
+      id: "SUBRO",
+      category: CAT_GEN,
+      title: "Subrogation / First-Dollar Priority",
+      regex: /\b(subrogation|right to recover|third party)\b/ig,
+      requiredAny: ["first", "reimburse", "repay", "recover", "priority"],
+      type: "Financial Risk",
+      badge: "b-soft",
+      analysis: "Subrogation and recovery language often determines whether the carrier can offset reimbursements based on third-party recoveries. The important distinction is whether the carrier looks to money actually recovered versus amounts it believes could have been recovered. Priority language also matters because it can affect whether the plan must reimburse the carrier before retaining any recovery."
+    },
+    {
+      id: "IRO_EXTENSION",
+      category: CAT_GEN,
+      title: "Independent Review / External Appeal Extension",
+      regex: /\b(independent review organization|external appeal|iro)\b/ig,
+      type: "Pro-Plan Feature",
+      badge: "b-info",
+      analysis: "If the policy contains an external review or appeal extension concept, the details matter for timing. In practice, claims can flip from denied to payable months later due to appeals or independent review outcomes. Policies vary on whether and how they treat those late payment obligations within the reimbursement window, which can create a gap on overturned denials."
+    },
+    {
+      id: "ARBITRATION",
+      category: CAT_GEN,
+      title: "Arbitration / Dispute Resolution",
+      regex: /\b(arbitration)\b/ig,
+      type: "Dispute Resolution",
+      badge: "b-soft",
+      analysis: "Arbitration provisions shape dispute resolution. If arbitration is mandatory or binding, it can limit court remedies and change the practical leverage in reimbursement disputes. It also can affect discovery and timing, which matters if a reimbursement issue needs quick resolution for cash-flow reasons."
+    },
+    {
+      id: "LEGAL_ACTION_LIMIT",
+      category: CAT_GEN,
+      title: "Suit Limitation / Legal Action Deadline",
+      regex: /\b(no legal action|more than (one|two|three|4|5|six|6) years)\b/ig,
+      type: "Dispute Resolution",
+      badge: "b-soft",
+      analysis: "A contractual limitation period for legal action can be shorter than a plan expects. If a carrier denies reimbursement and the plan does not act quickly, the policy may cut off the right to sue even if the denial is wrong. Short limitation periods are easy to miss and become painful only when it is too late."
+    }
+  ];
+
+  const MISSING_CHECKS = [
+    {
+      id: "MISSING_NSA",
+      title: "No Surprises Act / IDR / QPA",
+      regex: /\b(no surprises|qualifying payment amount|qpa|independent dispute resolution|idr)\b/ig,
+      category: CAT_MISSING,
+      type: "Gap",
+      badge: "b-hard",
+      analysis: "No explicit reference to the No Surprises Act, QPA, or IDR concepts was detected. This is a prompt to review, not proof of a gap. Many policy forms avoid those labels. The practical concern is whether allowable expense language could cap reimbursement below payment amounts the plan is obligated to make under federal requirements."
+    }
+  ];
+
+  // ------------------------------------------------------------------------
+  // SECTION 2: FILE PROCESSING (PDF/DOCX) -> text by page/section
+  // ------------------------------------------------------------------------
+
+  let pdfReady = false;
+  let docxReady = false;
+  let consolidatedFindings = [];
+  let fullDocText = "";
+  let inputFileName = "Policy_Review";
+
+  window.onload = function(){
+    try{
+      if(window.pdfjsLib){
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+        pdfReady = true;
+      }
+      if(window.mammoth) docxReady = true;
+    } catch(e){}
+
+    document.getElementById("fileInput").addEventListener("change", function(e){
+      if(e.target.files[0]) inputFileName = e.target.files[0].name.replace(/\.[^/.]+$/, "");
+    });
+
+    // If libs fail, show manual mode.
+    setTimeout(() => {
+      if(!pdfReady || !docxReady) document.getElementById("offlineFallback").style.display = "block";
+    }, 800);
+  };
+
+  async function processFile(){
+    const file = document.getElementById("fileInput").files[0];
+    if(!file){ alert("Please select a file."); return; }
+
+    try{
+      let pages = [];
+      if(file.name.toLowerCase().endsWith(".pdf")){
+        if(!pdfReady) throw new Error("PDF library not available. Use Offline Mode (paste text).");
+        pages = await readPDF(file);
+      } else if(file.name.toLowerCase().endsWith(".docx")){
+        if(!docxReady) throw new Error("DOCX library not available. Use Offline Mode (paste text).");
+        pages = await readDOCX(file);
+      } else {
+        alert("Only PDF/DOCX supported."); return;
+      }
+      analyzePages(pages);
+    } catch(e){
+      alert(e.message || "Unable to process file.");
+      document.getElementById("offlineFallback").style.display = "block";
+    }
+  }
+
+  function processManual(){
+    const text = document.getElementById("manualText").value;
+    if(!text || text.trim().length < 50){
+      alert("Paste the full policy text first.");
+      return;
+    }
+    analyzePages([{ num: "Text", text }]);
+  }
+
+  async function readPDF(file){
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument(buffer).promise;
+    let pages = [];
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push({ num: i, text: content.items.map(item => item.str).join(" ") });
+    }
+    return pages;
+  }
+
+  async function readDOCX(file){
+    const buffer = await file.arrayBuffer();
+    const res = await mammoth.extractRawText({ arrayBuffer: buffer });
+    return res.value.split(/\n\s*\n/).map((t,i)=>({ num:`Sec ${i+1}`, text:t }));
+  }
+
+  // ------------------------------------------------------------------------
+  // SECTION 3: CONTEXT EXTRACTION (pull a sentence/paragraph around a match)
+  // ------------------------------------------------------------------------
+
+  function extractContext(fullText, matchIndex, matchLength){
+    let start = matchIndex;
+    let foundStart = false;
+
+    for(let i=1;i<800;i++){
+      if(start - i < 0){ start = 0; foundStart = true; break; }
+      const ch = fullText[start - i];
+      if(ch === "\n" || ch === "\r"){ start = start - i + 1; foundStart = true; break; }
+    }
+
+    if(!foundStart){
+      for(let i=1;i<350;i++){
+        if(start - i < 0) break;
+        if(fullText[start - i] === "."){ start = start - i + 1; break; }
+      }
+    }
+
+    let end = matchIndex + matchLength;
+    let foundEnd = false;
+    for(let i=0;i<800;i++){
+      if(end + i >= fullText.length){ end = fullText.length; foundEnd = true; break; }
+      const ch = fullText[end + i];
+      if(ch === "\n" || ch === "\r"){ end = end + i; foundEnd = true; break; }
+    }
+
+    if(!foundEnd){
+      for(let i=0;i<350;i++){
+        if(end + i >= fullText.length) break;
+        if(fullText[end + i] === "."){ end = end + i + 1; break; }
+      }
+    }
+
+    let snippet = fullText.substring(start, end).trim();
+    if(!foundStart && start > 0) snippet = "..." + snippet;
+    if(!foundEnd && end < fullText.length) snippet = snippet + "...";
+    return snippet;
+  }
+
+  // ------------------------------------------------------------------------
+  // SECTION 4: ANALYSIS & DEDUPLICATION
+  // ------------------------------------------------------------------------
+
+  function analyzePages(pages){
+    const findingsMap = new Map();
+
+    // Preserve original casing for snippet; use lowered versions for logic checks.
+    const joined = pages.map(p => (p.text || "")).join("\n");
+    fullDocText = joined.toLowerCase();
+
+    pages.forEach(page => {
+      const cleanText = (page.text || "").replace(/\s+/g, " ");
+      const cleanLower = cleanText.toLowerCase();
+      const ruleClaims = new Map();
+
+      RULES.forEach(rule => {
+        rule.regex.lastIndex = 0;
+        let match;
+        while((match = rule.regex.exec(cleanText)) !== null){
+          const windowStart = Math.max(0, match.index - 140);
+          const windowEnd = Math.min(cleanText.length, match.index + match[0].length + 160);
+          const checkSnippet = cleanLower.substring(windowStart, windowEnd);
+
+          // self-dedupe
+          if(!ruleClaims.has(rule.id)) ruleClaims.set(rule.id, []);
+          const myClaims = ruleClaims.get(rule.id);
+          const isSelfClaimed = myClaims.some(r => (match.index >= r.start && match.index <= r.end));
+          if(isSelfClaimed) continue;
+
+          // forbiddenAny
+          if(rule.forbiddenAny && rule.forbiddenAny.some(tok => checkSnippet.includes(tok))) {
+            rule.regex.lastIndex = match.index + match[0].length;
+            continue;
+          }
+          // requiredAny
+          if(rule.requiredAny && !rule.requiredAny.some(tok => checkSnippet.includes(tok))) {
+            rule.regex.lastIndex = match.index + match[0].length;
+            continue;
+          }
+          // requiredAll
+          if(rule.requiredAll && !rule.requiredAll.every(tok => checkSnippet.includes(tok))) {
+            rule.regex.lastIndex = match.index + match[0].length;
+            continue;
+          }
+
+          myClaims.push({ start: match.index, end: match.index + match[0].length });
+
+          const smartSnippet = extractContext(cleanText, match.index, match[0].length);
+
+          if(!findingsMap.has(rule.id)){
+            findingsMap.set(rule.id, {
+              title: rule.title,
+              category: rule.category,
+              type: rule.type,
+              badge: rule.badge,
+              analysis: rule.analysis,
+              keyword: match[0],
+              rawSnippet: smartSnippet,
+            });
+          }
+          // jump forward a bit to reduce same-paragraph spam
+          rule.regex.lastIndex = match.index + Math.max(60, match[0].length);
+        }
+      });
+    });
+
+    // Missing checks (reset lastIndex to avoid /g test-state bugs)
+    MISSING_CHECKS.forEach(chk => {
+      chk.regex.lastIndex = 0;
+      if(!chk.regex.test(fullDocText)){
+        findingsMap.set(chk.id, {
+          title: chk.title,
+          category: chk.category,
+          type: chk.type,
+          badge: chk.badge,
+          analysis: chk.analysis,
+          keyword: "",
+          rawSnippet: "N/A"
+        });
+      }
+    });
+
+    // Stable ordering by category then title
+    const catOrder = [CAT_KEY, CAT_DEF, CAT_EXC, CAT_GEN, CAT_MISSING];
+    consolidatedFindings = Array.from(findingsMap.values()).sort((a,b) => {
+      const ca = catOrder.indexOf(a.category);
+      const cb = catOrder.indexOf(b.category);
+      if(ca !== cb) return ca - cb;
+      return a.title.localeCompare(b.title);
+    });
+
+    displayFindings();
+  }
+
+  function displayFindings(){
+    const tbody = document.getElementById("tableBody");
+    const countSpan = document.getElementById("countDisplay");
+    tbody.innerHTML = "";
+    countSpan.innerText = consolidatedFindings.length;
+
+    if(consolidatedFindings.length === 0){
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px;">No significant findings based on current rules.</td></tr>`;
+      document.getElementById("resultsArea").style.display = "block";
+      return;
+    }
+
+    consolidatedFindings.forEach(f => {
+      const kw = (f.keyword || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const htmlSnip = (f.rawSnippet || "N/A").replace(new RegExp(`(${kw})`, "gi"), "<mark>$1</mark>");
+      const row = `<tr>
+        <td><span class="badge ${f.badge}">${f.type}</span><br><small>${f.title}</small><br><small style="color:#666;">${f.category}</small></td>
+        <td style="font-family:monospace; font-size:0.85em;">${htmlSnip}</td>
+        <td>${f.analysis}</td>
+      </tr>`;
+      tbody.insertAdjacentHTML("beforeend", row);
+    });
+
+    document.getElementById("resultsArea").style.display = "block";
+  }
+
+  // ------------------------------------------------------------------------
+  // SECTION 5: EXPORT (Clipboard & Word)
+  // ------------------------------------------------------------------------
+
+  // CHANGED: normalize common mojibake sequences so Word export doesn't show â€™ / â€œ / etc.
+  function normalizeText(s){
+    if(s === null || s === undefined) return "";
+    let t = String(s);
+
+    // Strip common stray "Â" (non-breaking space artifacts)
+    t = t.replace(/\u00C2/g, "");
+
+    // Common mojibake -> proper punctuation
+    t = t
+      .replace(/â€™/g, "’")
+      .replace(/â€˜/g, "‘")
+      .replace(/â€œ/g, "“")
+      .replace(/â€/g, "”")
+      .replace(/â€“/g, "–")
+      .replace(/â€”/g, "—")
+      .replace(/â€¦/g, "…")
+      .replace(/â€¢/g, "•")
+      .replace(/â€/g, "”")
+      .replace(/â€/g, "")
+      .replace(/â€/g, "-")
+      .replace(/â€/g, "")
+      .replace(/â€‹/g, "");
+
+    // Last-resort cleanup for occasional replacement-char sequences
+    t = t.replace(/\uFFFD/g, "");
+
+    return t;
+  }
+
+  function copyPipeText(){
+    if(consolidatedFindings.length === 0) return;
+
+    let text = "Category|Issue|Snippet|Commentary\n";
+    consolidatedFindings.forEach(f => {
+      const cleanSnip = normalizeText((f.rawSnippet || "N/A"))
+        .replace(/(\r\n|\n|\r)/gm, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      text += `${normalizeText(f.category)}|${normalizeText(f.title)}|${cleanSnip}|${normalizeText(f.analysis)}\n`;
+    });
+
+    const el = document.createElement("textarea");
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
+    alert("Copied to clipboard!");
+  }
+
+  function exportToWord(){
+    if(consolidatedFindings.length === 0){ alert("No findings."); return; }
+
+    const format = (document.querySelector('input[name="exportFormat"]:checked') || { value: "table" }).value;
+
+    const {
+      Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+      Table, TableRow, TableCell, WidthType, TableLayoutType, ShadingType, PageOrientation
+    } = docx;
+
+    const dateStr = new Date().toLocaleDateString();
+
+    // Page layout (portrait; tighter margins for usable width)
+    const margin = { top: 720, bottom: 720, left: 720, right: 720 }; // 0.5"
+    const PAGE_W = 12240; // 8.5"
+    const CONTENT_W = PAGE_W - (margin.left + margin.right); // 10800
+
+    // Table column widths (DXA / twips)
+    const COL_ISSUE = 2400;
+    const COL_SNIP  = 3600;
+    const COL_ANAL  = CONTENT_W - (COL_ISSUE + COL_SNIP);
+
+    const headerParagraphs = [
+      new Paragraph({ text: normalizeText("MEMORANDUM"), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER, spacing: { after: 240 } }),
+      new Paragraph({ children: [ new TextRun({ text: normalizeText("TO:      "), bold: true }), new TextRun(normalizeText("[Client/TPA Name]")) ] }),
+      new Paragraph({ children: [ new TextRun({ text: normalizeText("FROM:  "), bold: true }), new TextRun(normalizeText("The Phia Group, LLC")) ] }),
+      new Paragraph({ children: [ new TextRun({ text: normalizeText("DATE:   "), bold: true }), new TextRun(normalizeText(dateStr)) ] }),
+      new Paragraph({ children: [ new TextRun({ text: normalizeText("RE:      "), bold: true }), new TextRun(normalizeText("Stop-Loss Policy Review: " + inputFileName)) ], spacing: { after: 240 } }),
+      new Paragraph({
+        text: normalizeText("This review highlights policy terms that can drive reimbursement gaps, administrative friction, or disputes over what the Carrier will treat as a reimbursable expense. It is intended to surface the provisions that typically matter most in practice."),
+        spacing: { after: 240 }
+      })
+    ];
+
+    const disclaimer = new Paragraph({
+      children: [
+        new TextRun({
+          text: normalizeText("Disclaimer: This opinion is based on the facts as presented and re-stated above, and our research, which includes the sources utilized as of the date this opinion has been drafted. This is a consulting opinion only, and does not purport to offer legal advice or fiduciary guidance as to the denial or acceptance of claims or appeals. This opinion is based upon our interpretation of the relevant materials and may not conform to official interpretations of statutes, regulations, contracts, or other materials. Subsequent changes in applicable law may change the result of this opinion. Ultimately the Employer/Plan Sponsor is responsible for making all business decisions related to their benefit offerings (including drafting and ratifying its plan documents) and, as the Plan Administrator, has the discretionary authority to interpret the terms of the Plan Document and make benefit determinations."),
+          italics: true,
+          size: 16,
+          color: "666666"
+        })
+      ],
+      spacing: { before: 360 }
+    });
+
+    const ORDER = [CAT_KEY, CAT_DEF, CAT_EXC, CAT_GEN, CAT_MISSING];
+
+    function buildTableChildren(){
+      const rows = [];
+
+      rows.push(new TableRow({
+        tableHeader: true,
+        children: [
+          new TableCell({
+            width: { size: COL_ISSUE, type: WidthType.DXA },
+            children: [ new Paragraph({ children: [ new TextRun({ text: normalizeText("Issue"), bold: true }) ] }) ]
+          }),
+          new TableCell({
+            width: { size: COL_SNIP, type: WidthType.DXA },
+            children: [ new Paragraph({ children: [ new TextRun({ text: normalizeText("Policy Language"), bold: true }) ] }) ]
+          }),
+          new TableCell({
+            width: { size: COL_ANAL, type: WidthType.DXA },
+            children: [ new Paragraph({ children: [ new TextRun({ text: normalizeText("Phia Analysis"), bold: true }) ] }) ]
+          })
+        ]
+      }));
+
+      ORDER.forEach(cat => {
+        const items = consolidatedFindings.filter(f => f.category === cat);
+        if(items.length === 0) return;
+
+        rows.push(new TableRow({
+          children: [
+            new TableCell({
+              columnSpan: 3,
+              shading: { type: ShadingType.CLEAR, fill: "0056b3" },
+              children: [ new Paragraph({ children: [ new TextRun({ text: normalizeText(cat), bold: true, color: "FFFFFF" }) ] }) ]
+            })
+          ]
+        }));
+
+        items.forEach(f => {
+          const issueLabel = normalizeText(`${f.title} (${f.type})`);
+          const snippetText = normalizeText((f.rawSnippet && f.rawSnippet !== "N/A") ? f.rawSnippet : "N/A");
+
+          rows.push(new TableRow({
+            children: [
+              new TableCell({
+                width: { size: COL_ISSUE, type: WidthType.DXA },
+                children: [ new Paragraph({ children: [ new TextRun({ text: issueLabel, bold: true }) ] }) ]
+              }),
+              new TableCell({
+                width: { size: COL_SNIP, type: WidthType.DXA },
+                children: [ new Paragraph({ children: [ new TextRun({ text: snippetText, italics: true, size: 20 }) ] }) ]
+              }),
+              new TableCell({
+                width: { size: COL_ANAL, type: WidthType.DXA },
+                children: [ new Paragraph({ children: [ new TextRun({ text: normalizeText(f.analysis) }) ] }) ]
+              })
+            ]
+          }));
+        });
+      });
+
+      const table = new Table({
+        width: { size: CONTENT_W, type: WidthType.DXA },
+        layout: TableLayoutType.FIXED,
+        rows
+      });
+
+      return [...headerParagraphs, table, disclaimer];
+    }
+
+    function buildMemoChildren(){
+      const kids = [...headerParagraphs];
+
+      ORDER.forEach(cat => {
+        const items = consolidatedFindings.filter(f => f.category === cat);
+        if(items.length === 0) return;
+
+        kids.push(new Paragraph({
+          text: normalizeText(cat),
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 240, after: 120 }
+        }));
+
+        items.forEach(f => {
+          kids.push(new Paragraph({
+            text: normalizeText(`${f.title} (${f.type})`),
+            heading: HeadingLevel.HEADING_3,
+            spacing: { after: 60 }
+          }));
+
+          const snippetText = normalizeText((f.rawSnippet && f.rawSnippet !== "N/A") ? f.rawSnippet : "N/A");
+          kids.push(new Paragraph({
+            children: [
+              new TextRun({ text: normalizeText("Policy Language: "), bold: true }),
+              new TextRun({ text: snippetText, italics: true })
+            ],
+            spacing: { after: 120 }
+          }));
+
+          kids.push(new Paragraph({
+            children: [ new TextRun({ text: normalizeText(f.analysis) }) ],
+            spacing: { after: 240 }
+          }));
+        });
+      });
+
+      kids.push(disclaimer);
+      return kids;
+    }
+
+    const bodyChildren = (format === "memo") ? buildMemoChildren() : buildTableChildren();
+
+    const docOut = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin,
+            size: { orientation: PageOrientation.PORTRAIT }
+          }
+        },
+        children: bodyChildren
+      }]
+    });
+
+    Packer.toBlob(docOut).then(blob => saveAs(blob, `${inputFileName}_REVIEW.docx`));
+  }
+</script>
+
+</body>
+</html>
