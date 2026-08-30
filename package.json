@@ -1,6 +1,6 @@
 {
   "name": "stop-loss-policy-review-workbench",
-  "version": "16.0.0",
+  "version": "16.1.0",
   "private": true,
   "description": "Local-first deterministic stop-loss contract review and comparison workbench",
   "scripts": {

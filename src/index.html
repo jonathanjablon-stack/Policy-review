@@ -6,7 +6,6 @@
   <meta name="color-scheme" content="light">
   <title>Stop-Loss Policy Review Workbench</title>
   <link rel="stylesheet" href="styles.css">
-  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
 </head>
 <body>
@@ -15,7 +14,7 @@
       <p class="eyebrow">Local-first contract analysis</p>
       <h1>Stop-Loss Policy Review Workbench</h1>
     </div>
-    <div class="version-badge">v16.0.0 <span>Rules 1.0.0</span></div>
+    <div class="version-badge">v16.1.0 <span>Rules 1.0.0</span></div>
   </header>
 
   <main>
@@ -58,6 +57,15 @@
           <ol id="rightFileList" class="file-list"></ol>
           <details><summary>Manual text fallback</summary><textarea id="rightManual" rows="6" placeholder="Paste comparison text here."></textarea></details>
         </article>
+      </section>
+
+      <section class="ocr-settings panel" aria-label="OCR settings">
+        <div>
+          <p class="step">Automatic local OCR</p>
+          <h3>Built in and always enabled when PDF text extraction is inadequate</h3>
+          <p>Pages are rendered locally and recognized in this browser with Tesseract. Policy pages are not uploaded to an OCR service.</p>
+        </div>
+        <label class="ocr-force"><input id="forceOcrAll" type="checkbox"><span><strong>OCR every PDF page</strong><small>Useful for hybrid scans or PDFs whose hidden text layer is inaccurate. This is slower.</small></span></label>
       </section>
 
       <div id="startError" class="alert error" role="alert" hidden></div>
@@ -109,6 +117,7 @@
 
   <script src="../rules/rule-library.js"></script>
   <script src="parsing/document-model.js"></script>
+  <script src="parsing/ocr-engine.js"></script>
   <script src="analysis/workbench-engine.js"></script>
   <script src="comparison/comparison-engine.js"></script>
   <script src="ui/app.js"></script>

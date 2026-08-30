@@ -2,6 +2,7 @@
   "use strict";
 
   const DocumentModel = globalThis.StopLossDocumentModel;
+  const OcrEngine = globalThis.StopLossOcrEngine;
   const Engine = globalThis.StopLossWorkbenchEngine;
   const Comparison = globalThis.StopLossComparisonEngine;
   const RuleLibrary = globalThis.StopLossRuleLibrary;
@@ -27,8 +28,10 @@
     saveSessionButton: $("saveSessionButton"), executiveExportButton: $("executiveExportButton"), detailedExportButton: $("detailedExportButton"),
     excelExportButton: $("excelExportButton"), sourceDialog: $("sourceDialog"), sourceDialogTitle: $("sourceDialogTitle"),
     sourceMeta: $("sourceMeta"), sourceText: $("sourceText"), closeSourceButton: $("closeSourceButton"),
-    busyLayer: $("busyLayer"), busyMessage: $("busyMessage")
+    busyLayer: $("busyLayer"), busyMessage: $("busyMessage"), forceOcrAll: $("forceOcrAll")
   };
+
+  let pdfJsPromise = null;
 
   const modeCopy = {
     standalone: ["Policy and modifying documents", "Add the base policy, schedule, endorsements, riders, and amendments in controlling sequence.", "", ""],
@@ -71,6 +74,30 @@
     Array.from(input.files || []).forEach((file, index) => target.append(element("li", { text: `${index + 1}. ${file.name} (${Math.ceil(file.size / 1024)} KB)` })));
   }
 
+  function assetUrl(relativePath) {
+    const base = new URL(document.baseURI);
+    const nestedBuild = /\/(?:dist|src)\/[^/]*$/.test(base.pathname);
+    return new URL(`${nestedBuild ? "../" : "./"}vendor/${relativePath.replace(/^\//, "")}`, base).href;
+  }
+
+  async function getPdfJs() {
+    if (globalThis.pdfjsLib) return globalThis.pdfjsLib;
+    if (!pdfJsPromise) {
+      pdfJsPromise = import(assetUrl("pdfjs/pdf.min.mjs")).then(module => {
+        module.GlobalWorkerOptions.workerSrc = assetUrl("pdfjs/pdf.worker.min.mjs");
+        return module;
+      });
+    }
+    try { return await pdfJsPromise; }
+    catch (error) { throw new Error(`The built-in PDF engine could not start. Open the included app through a static web server rather than directly from a local file. ${error.message || error}`); }
+  }
+
+  function reportOcrProgress(update) {
+    const page = update.pageNumber ? `page ${update.pageNumber}${update.pageCount ? ` of ${update.pageCount}` : ""}` : "page";
+    const percent = Number.isFinite(update.progress) ? ` (${update.progress}%)` : "";
+    ui.busyMessage.textContent = `${update.documentName || "PDF"}: local OCR ${page}, ${update.status || "working"}${percent}`;
+  }
+
   function reconstructPdfLines(items) {
     const lines = [];
     items.forEach(item => {
@@ -82,19 +109,68 @@
     return lines.sort((a, b) => b.y - a.y).map(line => line.items.sort((a, b) => a.x - b.x).map(x => x.text).join(" ").replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
   }
 
-  async function readFile(file, sequence, side) {
+  async function readPdf(file, ocrSession, forceAllPages) {
+    const pdfjs = await getPdfJs();
+    const loadingTask = pdfjs.getDocument({
+      data: await file.arrayBuffer(),
+      cMapUrl: assetUrl("pdfjs/cmaps/"),
+      cMapPacked: true,
+      standardFontDataUrl: assetUrl("pdfjs/standard_fonts/"),
+      wasmUrl: assetUrl("pdfjs/wasm/")
+    });
+    const pdf = await loadingTask.promise;
+    const pages = [];
+    try {
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        ui.busyMessage.textContent = `${file.name}: extracting page ${pageNumber} of ${pdf.numPages}`;
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const nativeText = reconstructPdfLines(content.items);
+        const decision = OcrEngine.shouldOcrPage(nativeText, { forceAllPages });
+        let selected = { text: nativeText, method: "native", ocrUsed: false, nativeQuality: decision.nativeQuality, ocrQuality: null, ocrConfidence: null, selectionReason: "Native PDF extraction passed the text-quality threshold." };
+        let ocrResult = null;
+        let ocrError = null;
+        if (decision.shouldOCR) {
+          try {
+            ocrResult = await ocrSession.recognizePage(page, { documentName: file.name, pageNumber, pageCount: pdf.numPages });
+            selected = OcrEngine.selectPageText(nativeText, ocrResult);
+          } catch (error) {
+            ocrError = error && error.message ? error.message : String(error);
+          }
+        }
+        pages.push({
+          number: pageNumber,
+          text: selected.text,
+          originalText: selected.text,
+          nativeText,
+          extractionMethod: selected.method,
+          ocr: {
+            attempted: decision.shouldOCR,
+            used: selected.ocrUsed,
+            confidence: selected.ocrConfidence,
+            reason: decision.reason,
+            selectionReason: selected.selectionReason,
+            nativeCharacters: decision.nativeQuality.characters,
+            ocrCharacters: selected.ocrQuality ? selected.ocrQuality.characters : 0,
+            engine: ocrResult && ocrResult.engine || `Tesseract.js ${OcrEngine.TESSERACT_VERSION}`,
+            elapsedMs: ocrResult && ocrResult.elapsedMs || null,
+            renderedDpi: ocrResult && ocrResult.renderedDpi || null,
+            error: ocrError
+          }
+        });
+        page.cleanup();
+      }
+    } finally {
+      await pdf.destroy();
+    }
+    return pages;
+  }
+
+  async function readFile(file, sequence, side, ocrSession, forceAllPages) {
     const lower = file.name.toLowerCase();
     let pages;
     if (lower.endsWith(".pdf")) {
-      if (!globalThis.pdfjsLib) throw new Error(`${file.name}: PDF.js did not load. Check the network once, or use the manual text fallback.`);
-      globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-      const pdf = await globalThis.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-      pages = [];
-      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-        const page = await pdf.getPage(pageNumber);
-        const content = await page.getTextContent();
-        pages.push({ number: pageNumber, text: reconstructPdfLines(content.items) });
-      }
+      pages = await readPdf(file, ocrSession, forceAllPages);
     } else if (lower.endsWith(".docx")) {
       if (!globalThis.mammoth) throw new Error(`${file.name}: Mammoth did not load. Check the network once, or use the manual text fallback.`);
       const result = await globalThis.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
@@ -105,12 +181,12 @@
     return DocumentModel.parseDocument({ id: `${side}-${sequence + 1}`, name: file.name, pages, sequence });
   }
 
-  async function readDocumentSet(input, manual, side) {
+  async function readDocumentSet(input, manual, side, ocrSession, forceAllPages) {
     const files = Array.from(input.files || []);
     const documents = [];
     for (let index = 0; index < files.length; index += 1) {
       ui.busyMessage.textContent = `Reading ${files[index].name} (${index + 1} of ${files.length})`;
-      documents.push(await readFile(files[index], index, side));
+      documents.push(await readFile(files[index], index, side, ocrSession, forceAllPages));
     }
     if (manual.value.trim()) documents.push(DocumentModel.parseDocument({ id: `${side}-manual`, name: `${side === "left" ? "Document set A" : "Document set B"} manual text`, text: manual.value, sequence: documents.length }));
     return documents;
@@ -128,15 +204,16 @@
     if (!(ui.leftFiles.files.length || ui.leftManual.value.trim())) return showError("Add at least one document or manual-text source to Document set A.");
     if (needsRight && !(ui.rightFiles.files.length || ui.rightManual.value.trim())) return showError("This comparison mode requires at least one document or manual-text source in Document set B.");
     showBusy("Reading documents...");
+    const ocrSession = OcrEngine.createSession({ resolveAssetUrl: assetUrl, onProgress: reportOcrProgress, targetDpi: 220, maxPixels: 12000000 });
     try {
-      const leftDocs = await readDocumentSet(ui.leftFiles, ui.leftManual, "left");
+      const leftDocs = await readDocumentSet(ui.leftFiles, ui.leftManual, "left", ocrSession, ui.forceOcrAll.checked);
       state.leftAnalysis = Engine.analyzeMatter(leftDocs, RuleLibrary, state.mode === "standalone" ? "standalone" : state.mode);
       if (state.mode === "standalone") {
         state.analysis = state.leftAnalysis;
         state.rightAnalysis = null;
         state.comparison = null;
       } else {
-        const rightDocs = await readDocumentSet(ui.rightFiles, ui.rightManual, "right");
+        const rightDocs = await readDocumentSet(ui.rightFiles, ui.rightManual, "right", ocrSession, ui.forceOcrAll.checked);
         state.rightAnalysis = Engine.analyzeMatter(rightDocs, RuleLibrary, state.mode);
         state.analysis = null;
         state.comparison = Comparison.buildComparison(state.leftAnalysis, state.rightAnalysis, state.mode);
@@ -144,7 +221,10 @@
       openWorkspace();
     } catch (error) {
       showError(error && error.message ? error.message : String(error));
-    } finally { hideBusy(); }
+    } finally {
+      await ocrSession.terminate().catch(() => {});
+      hideBusy();
+    }
   }
 
   function navItems() {
@@ -165,7 +245,7 @@
     navItems().forEach(([id, label]) => ui.sectionNav.append(element("button", { type: "button", text: label, "data-section": id, onclick: () => renderSection(id) })));
     const warnings = docs.flatMap(d => d.health.unreadablePages.map(page => `${d.name}, page ${page}`));
     ui.globalWarning.hidden = !warnings.length;
-    ui.globalWarning.textContent = warnings.length ? `Manual inspection or OCR required: ${warnings.join("; ")}. The workbench does not treat these pages as reviewed.` : "";
+    ui.globalWarning.textContent = warnings.length ? `Automatic local OCR could not recover usable text from: ${warnings.join("; ")}. Those pages still require manual inspection and are not treated as reviewed.` : "";
     renderSection("overview");
   }
 
@@ -179,9 +259,10 @@
     const events = analyses.flatMap(a => a.hierarchyEvents);
     const priorities = Array.from(uniqueFindings.values()).filter(f => ["Critical", "High"].includes(f.severity)).slice(0, 12);
     const favorable = Array.from(uniqueFindings.values()).filter(f => f.classification === "Favorable Provision");
+    const ocrPages = documents.reduce((total, document) => total + document.health.ocrPages.length, 0);
     const intro = state.mode === "standalone" ? state.analysis.summary.text : `${state.leftAnalysis.summary.text} ${state.rightAnalysis.summary.text} ${state.comparison.caution}`;
     ui.sectionContent.append(
-      element("div", { class: "metric-grid" }, [metric("Documents", documents.length), metric("Current concepts", uniqueFindings.size), metric("Critical / high", priorities.length), metric("Favorable", favorable.length), metric("Hierarchy events", events.length)]),
+      element("div", { class: "metric-grid" }, [metric("Documents", documents.length), metric("OCR pages", ocrPages), metric("Current concepts", uniqueFindings.size), metric("Critical / high", priorities.length), metric("Favorable", favorable.length), metric("Hierarchy events", events.length)]),
       element("article", { class: "card" }, [element("h3", { text: "Executive summary" }), element("p", { text: intro })]),
       element("article", { class: "card" }, [element("h3", { text: "Top priority review leads" }), element("div", { class: "priority-list" }, priorities.length ? priorities.map(f => element("div", { class: "priority-row" }, [element("div", {}, [element("strong", { text: f.title }), element("div", { text: `${f.category} | ${f.classification}` })]), element("span", { class: `badge ${f.severity}`, text: f.severity })])) : [element("p", { text: "No critical or high-priority concepts were located in extractable text." })])]),
       element("article", { class: "card" }, [element("h3", { text: "Required review posture" }), element("p", { text: "Every candidate is a deterministic review lead. Standalone detection does not establish a confirmed plan/policy gap. Missing indicators are reported as not located or unable to determine. Reviewer dispositions control exports." })])
@@ -194,14 +275,18 @@
     const list = element("div", { class: "document-health" });
     docs.forEach(doc => {
       const detail = `${doc.pages.length} page(s), ${doc.clauses.length} operative clause(s), role: ${doc.role}, sequence: ${doc.sequence + 1}`;
-      const warning = doc.health.unreadablePages.length ? doc.health.warning : "All pages contained a usable amount of extractable text.";
-      list.append(element("div", { class: "health-row" }, [element("div", {}, [element("strong", { text: doc.name }), element("p", { text: detail }), element("p", { text: warning })]), element("span", { class: `badge ${doc.health.status === "Readable" ? "Low" : "High"}`, text: doc.health.status })]));
+      const pageDetails = element("details");
+      pageDetails.append(element("summary", { text: "Page extraction details" }));
+      const pageList = element("ul", { class: "file-list" });
+      doc.health.pages.forEach(page => pageList.append(element("li", { text: `Page ${page.page}: ${page.status}; ${page.extractionMethod}${page.ocrAttempted ? `; OCR attempted${page.ocrConfidence === null ? "" : ` at ${page.ocrConfidence}% confidence`}${page.ocrRenderedDpi === null ? "" : `, ${page.ocrRenderedDpi} DPI`}${page.ocrElapsedMs === null ? "" : `, ${Math.round(page.ocrElapsedMs / 100) / 10}s`}` : ""}${page.ocrError ? `; error: ${page.ocrError}` : ""}` })));
+      pageDetails.append(pageList);
+      list.append(element("div", { class: "health-row" }, [element("div", {}, [element("strong", { text: doc.name }), element("p", { text: detail }), element("p", { text: doc.health.warning }), pageDetails]), element("span", { class: `badge ${doc.health.status.startsWith("Readable") ? "Low" : "High"}`, text: doc.health.status })]));
     });
     box.append(list); ui.sectionContent.append(box);
   }
 
   function findFactSource(fact) {
-    openSource({ title: fact.label, sourceDocument: fact.sourceDocument, page: fact.page, section: fact.section, hierarchyStatus: "extracted fact", operativeLanguage: fact.sourceText });
+    openSource({ title: fact.label, sourceDocument: fact.sourceDocument, page: fact.page, section: fact.section, hierarchyStatus: "extracted fact", operativeLanguage: fact.sourceText, extractionMethod: fact.extractionMethod, ocrConfidence: fact.ocrConfidence });
   }
 
   function renderFacts() {
@@ -212,7 +297,7 @@
     Array.from(byField.values()).flatMap(items => items).forEach(fact => {
       const input = element("input", { class: "field-control", value: fact.reviewerValue || fact.value, "aria-label": `Reviewer value for ${fact.label}` });
       input.addEventListener("change", () => { fact.reviewerValue = input.value; fact.reviewerStatus = "Reviewed / edited"; });
-      grid.append(element("article", { class: "fact-card" }, [element("label", { text: fact.label }), input, element("div", { class: "fact-source", text: `${fact.sourceDocument}, p. ${fact.page} | ${fact.confidence} confidence` }), element("button", { class: "source-button", type: "button", text: "View source", onclick: () => findFactSource(fact) })]));
+      grid.append(element("article", { class: "fact-card" }, [element("label", { text: fact.label }), input, element("div", { class: "fact-source", text: `${fact.sourceDocument}, p. ${fact.page} | ${fact.confidence} finding confidence | ${fact.extractionMethod === "ocr" ? `local OCR${fact.ocrConfidence === null ? "" : ` ${fact.ocrConfidence}%`}` : "native text"}` }), element("button", { class: "source-button", type: "button", text: "View source", onclick: () => findFactSource(fact) })]));
     });
     if (!facts.length) grid.append(element("p", { text: "No structured fields were located in extractable text. Values were not inferred." }));
     ui.sectionContent.append(note, grid);
@@ -289,7 +374,7 @@
     const events = sessionAnalyses().flatMap(a => a.hierarchyEvents);
     const box = element("article", { class: "card" }, [element("h3", { text: "Document hierarchy and amendment events" }), element("p", { text: "The workbench marks superseded language only where a modifying clause and affected concept can be linked deterministically. Unmapped hierarchy language remains visible for attorney review." })]);
     const list = element("div", { class: "findings-list" });
-    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: "badge Moderate", text: event.action }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: event.action, operativeLanguage: event.modifyingLanguage }) })])])));
+    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: "badge Moderate", text: event.action }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: event.action, operativeLanguage: event.modifyingLanguage, extractionMethod: event.extractionMethod, ocrConfidence: event.ocrConfidence }) })])])));
     if (!events.length) list.append(element("p", { text: "No explicit hierarchy events were mapped in extractable text." }));
     ui.sectionContent.append(box, list);
   }
@@ -321,7 +406,7 @@
 
   function openSource(source) {
     ui.sourceDialogTitle.textContent = source.title || "Provision source"; clear(ui.sourceMeta);
-    [["Document", source.sourceDocument], ["Page", source.page], ["Section", source.section], ["Hierarchy", source.hierarchyStatus], ["Confidence", source.confidence], ["Trigger", source.exactTrigger]].filter(([, v]) => v !== undefined && v !== null).forEach(([term, value]) => ui.sourceMeta.append(element("dt", { text: term }), element("dd", { text: String(value) })));
+    [["Document", source.sourceDocument], ["Page", source.page], ["Section", source.section], ["Hierarchy", source.hierarchyStatus], ["Confidence", source.confidence], ["Extraction", source.extractionMethod === "ocr" ? "Automatic local OCR" : source.extractionMethod], ["OCR page confidence", Number.isFinite(source.ocrConfidence) ? `${source.ocrConfidence}%` : null], ["Trigger", source.exactTrigger]].filter(([, v]) => v !== undefined && v !== null).forEach(([term, value]) => ui.sourceMeta.append(element("dt", { text: term }), element("dd", { text: String(value) })));
     ui.sourceText.textContent = source.operativeLanguage || source.surroundingContext || "No source text available.";
     if (typeof ui.sourceDialog.showModal === "function") ui.sourceDialog.showModal(); else ui.sourceDialog.setAttribute("open", "");
   }
@@ -342,11 +427,12 @@
     const facts = analysis.facts.slice(0, detailed ? analysis.facts.length : 20);
     const completeness = analysis.completeness.filter(row => detailed || ["Located", "Multiple provisions located", "Unable to determine"].includes(row.status));
     const styles = "body{font-family:Arial,sans-serif;color:#17263a;line-height:1.45;margin:48px}h1{color:#0b2d4f;border-bottom:3px solid #1769aa;padding-bottom:8px}h2{color:#0b2d4f;margin-top:28px}table{width:100%;border-collapse:collapse;font-size:10pt}th{background:#dceaf4}th,td{border:1px solid #9fb0c0;padding:7px;vertical-align:top}.source{color:#617186;font-size:9pt}.warning{background:#fff4d8;padding:10px}";
-    const factRows = facts.map(f => `<tr><td>${escapeHtml(f.label)}</td><td>${escapeHtml(f.reviewerValue || f.value)}</td><td>${escapeHtml(f.sourceDocument)}, p. ${f.page}</td></tr>`).join("");
-    const findingBlocks = selected.map(f => `<h3>${escapeHtml(f.title)} (${escapeHtml(f.severity)})</h3><p><b>${escapeHtml(f.classification)}</b> | ${escapeHtml(f.disposition)} | ${escapeHtml(f.confidence)} confidence</p><p><b>Source:</b> ${escapeHtml(f.sourceDocument)}, p. ${f.page}, ${escapeHtml(f.section)}</p><blockquote>${escapeHtml(f.exactLanguage)}</blockquote><p><b>Why it matters:</b> ${escapeHtml(f.whyItMatters)}</p><p><b>Recommended action:</b> ${escapeHtml(f.recommendedAction)}</p>${f.reviewerNotes ? `<p><b>Reviewer notes:</b> ${escapeHtml(f.reviewerNotes)}</p>` : ""}`).join("");
+    const extractionLabel = source => source.extractionMethod === "ocr" ? `automatic local OCR${Number.isFinite(source.ocrConfidence) ? ` (${source.ocrConfidence}% page confidence)` : ""}` : source.extractionMethod === "manual" ? "manual text" : "native text";
+    const factRows = facts.map(f => `<tr><td>${escapeHtml(f.label)}</td><td>${escapeHtml(f.reviewerValue || f.value)}</td><td>${escapeHtml(f.sourceDocument)}, p. ${f.page}<br><span class="source">${escapeHtml(extractionLabel(f))}</span></td></tr>`).join("");
+    const findingBlocks = selected.map(f => { const source = f.occurrences.find(o => o.hierarchyStatus !== "superseded") || f.occurrences[0] || f; return `<h3>${escapeHtml(f.title)} (${escapeHtml(f.severity)})</h3><p><b>${escapeHtml(f.classification)}</b> | ${escapeHtml(f.disposition)} | ${escapeHtml(f.confidence)} confidence</p><p><b>Source:</b> ${escapeHtml(f.sourceDocument)}, p. ${f.page}, ${escapeHtml(f.section)} | ${escapeHtml(extractionLabel(source))}</p><blockquote>${escapeHtml(f.exactLanguage)}</blockquote><p><b>Why it matters:</b> ${escapeHtml(f.whyItMatters)}</p><p><b>Recommended action:</b> ${escapeHtml(f.recommendedAction)}</p>${f.reviewerNotes ? `<p><b>Reviewer notes:</b> ${escapeHtml(f.reviewerNotes)}</p>` : ""}`; }).join("");
     const matrixRows = completeness.map(row => `<tr><td>${escapeHtml(row.concept)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.rationale)}</td></tr>`).join("");
     const comparisonHtml = state.comparison && detailed ? `<h2>Comparison matrix</h2><table><tr><th>Concept</th><th>Set A</th><th>Set B</th><th>Difference</th><th>Action</th></tr>${state.comparison.rows.filter(r => r.included).map(r => `<tr><td>${escapeHtml(r.concept)}</td><td>${escapeHtml(r.leftLanguage)}</td><td>${escapeHtml(r.rightLanguage)}</td><td>${escapeHtml(r.nature)}</td><td>${escapeHtml(r.recommendedAction)}</td></tr>`).join("")}</table>` : "";
-    return `<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body><h1>${detailed ? "Detailed Attorney Stop-Loss Review" : "Executive Stop-Loss Review"}</h1><p>${escapeHtml(new Date().toLocaleDateString())}</p><div class="warning">Deterministic review leads only. Reviewer dispositions control this report. Not located does not mean a confirmed gap.</div><h2>Executive summary</h2><p>${escapeHtml(analysis.summary.text)}</p><h2>Policy at a Glance</h2><table><tr><th>Field</th><th>Value</th><th>Source</th></tr>${factRows}</table><h2>${detailed ? "Selected findings" : "Priority findings"}</h2>${findingBlocks || "<p>No included findings met this report's selection criteria.</p>"}<h2>Completeness matrix</h2><table><tr><th>Concept</th><th>Status</th><th>Reason</th></tr>${matrixRows}</table>${comparisonHtml}<p class="source">Generated locally by Stop-Loss Policy Review Workbench v16.0.0. This report does not replace attorney judgment.</p></body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body><h1>${detailed ? "Detailed Attorney Stop-Loss Review" : "Executive Stop-Loss Review"}</h1><p>${escapeHtml(new Date().toLocaleDateString())}</p><div class="warning">Deterministic review leads only. Reviewer dispositions control this report. Not located does not mean a confirmed gap.</div><h2>Executive summary</h2><p>${escapeHtml(analysis.summary.text)}</p><h2>Policy at a Glance</h2><table><tr><th>Field</th><th>Value</th><th>Source</th></tr>${factRows}</table><h2>${detailed ? "Selected findings" : "Priority findings"}</h2>${findingBlocks || "<p>No included findings met this report's selection criteria.</p>"}<h2>Completeness matrix</h2><table><tr><th>Concept</th><th>Status</th><th>Reason</th></tr>${matrixRows}</table>${comparisonHtml}<p class="source">Generated locally by Stop-Loss Policy Review Workbench v16.1.0. This report does not replace attorney judgment.</p></body></html>`;
   }
 
   function exportWord(detailed) { saveBlob(detailed ? "stop-loss-detailed-attorney-review.doc" : "stop-loss-executive-review.doc", "application/msword;charset=utf-8", wordDocument(detailed)); }
@@ -356,19 +442,19 @@
   function exportExcel() {
     let rows;
     if (state.comparison) rows = [["Concept", "Category", "Set A Language", "Set B Language", "Difference", "Consequence", "Recommended Action", "Classification", "Severity", "Disposition"]].concat(state.comparison.rows.map(r => [r.concept, r.category, r.leftLanguage, r.rightLanguage, r.nature, r.consequence, r.recommendedAction, r.classification, r.severity, r.disposition]));
-    else rows = [["Rule ID", "Title", "Category", "Classification", "Severity", "Confidence", "Document", "Page", "Section", "Hierarchy", "Exact Language", "Why It Matters", "Recommended Action", "Disposition", "Reviewer Notes"]].concat(state.analysis.findings.map(f => [f.ruleId, f.title, f.category, f.classification, f.severity, f.confidence, f.sourceDocument, f.page, f.section, f.hierarchyStatus, f.exactLanguage, f.whyItMatters, f.recommendedAction, f.disposition, f.reviewerNotes]));
+    else rows = [["Rule ID", "Title", "Category", "Classification", "Severity", "Confidence", "Document", "Page", "Section", "Hierarchy", "Extraction", "OCR Page Confidence", "Exact Language", "Why It Matters", "Recommended Action", "Disposition", "Reviewer Notes"]].concat(state.analysis.findings.map(f => { const source = f.occurrences.find(o => o.hierarchyStatus !== "superseded") || f.occurrences[0] || {}; return [f.ruleId, f.title, f.category, f.classification, f.severity, f.confidence, f.sourceDocument, f.page, f.section, f.hierarchyStatus, source.extractionMethod || "native", Number.isFinite(source.ocrConfidence) ? source.ocrConfidence : "", f.exactLanguage, f.whyItMatters, f.recommendedAction, f.disposition, f.reviewerNotes]; }));
     saveBlob("stop-loss-review-matrix.xls", "application/vnd.ms-excel;charset=utf-8", "\ufeff" + rows.map(row => row.map(tsvCell).join("\t")).join("\n"));
   }
 
   function saveSession() {
-    const payload = { schemaVersion: "1.0.0", appVersion: "16.0.0", savedAt: new Date().toISOString(), mode: state.mode, leftAnalysis: state.leftAnalysis, rightAnalysis: state.rightAnalysis, analysis: state.analysis, comparison: state.comparison };
+    const payload = { schemaVersion: "1.1.0", appVersion: "16.1.0", savedAt: new Date().toISOString(), mode: state.mode, leftAnalysis: state.leftAnalysis, rightAnalysis: state.rightAnalysis, analysis: state.analysis, comparison: state.comparison };
     saveBlob("stop-loss-review-session.json", "application/json;charset=utf-8", JSON.stringify(payload, null, 2));
   }
 
   async function openSession(file) {
     try {
       const payload = JSON.parse(await file.text());
-      if (payload.schemaVersion !== "1.0.0" || !payload.mode) throw new Error("Unsupported or invalid session schema.");
+      if (!["1.0.0", "1.1.0"].includes(payload.schemaVersion) || !payload.mode) throw new Error("Unsupported or invalid session schema.");
       state.mode = payload.mode; state.leftAnalysis = payload.leftAnalysis; state.rightAnalysis = payload.rightAnalysis; state.analysis = payload.analysis; state.comparison = payload.comparison;
       const radio = document.querySelector(`input[name="mode"][value="${CSS.escape(state.mode)}"]`); if (radio) radio.checked = true; updateMode(); openWorkspace();
     } catch (error) { showError(`Could not open session: ${error.message || error}`); }
@@ -376,7 +462,7 @@
 
   function newReview() {
     state.leftAnalysis = state.rightAnalysis = state.analysis = state.comparison = null;
-    ui.workspaceView.hidden = true; ui.startView.hidden = false; ui.leftFiles.value = ""; ui.rightFiles.value = ""; ui.leftManual.value = ""; ui.rightManual.value = ""; clear(ui.leftFileList); clear(ui.rightFileList); hideError();
+    ui.workspaceView.hidden = true; ui.startView.hidden = false; ui.leftFiles.value = ""; ui.rightFiles.value = ""; ui.leftManual.value = ""; ui.rightManual.value = ""; ui.forceOcrAll.checked = false; clear(ui.leftFileList); clear(ui.rightFileList); hideError();
   }
 
   ui.workflowGrid.addEventListener("change", updateMode);

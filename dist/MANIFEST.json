@@ -1,14 +1,23 @@
 {
-  "version": "16.0.0",
+  "version": "16.1.0",
   "ruleLibraryVersion": "1.0.0",
   "builtAt": "2026-08-30T00:00:00.000Z",
-  "artifact": "StopLoss_Workbench_v16.0.0.html",
-  "sha256": "cc34dd5561d5ef176371241712a693009e037cd275fe4a408aab4825d8c2d32d",
-  "bytes": 110477,
+  "artifact": "StopLoss_Workbench_v16.1.0.html",
+  "sha256": "e11ccf22af25260f0535fd1d9d4b8f8544be40a69b0a374f0d200249b168ee8f",
+  "bytes": 130323,
+  "offlinePackage": "StopLoss_Workbench_v16.1.0-offline.zip",
+  "offlinePackageSha256": "64c8565eab317f7062a0e89f5e9885367f398f9b0a4e40607fbda159205a62a5",
+  "offlinePackageBytes": 8796965,
   "localProcessing": true,
+  "pdfRuntime": "PDF.js 5.6.205 (repository-local)",
+  "ocr": {
+    "automatic": true,
+    "engine": "Tesseract.js 7.0.0",
+    "language": "eng",
+    "repositoryLocalAssets": true
+  },
   "externalRuntimeDependencies": [
-    "PDF.js 3.11.174",
-    "Mammoth.js 1.8.0"
+    "Mammoth.js 1.8.0 (DOCX parsing only)"
   ],
   "manualTextFallback": true
 }

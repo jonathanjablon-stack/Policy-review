@@ -1,5 +1,9 @@
 # Version history
 
+## v16.1.0
+
+Added automatic repository-local OCR for PDF pages with inadequate native text. The release vendors PDF.js 5.6.205, Tesseract.js 7.0.0, compatible WebAssembly cores, and the English model; reuses one lazy worker; retains OCR provenance and confidence throughout analysis and export; verifies asset and package integrity; and ships a reproducible offline ZIP.
+
 ## v16.0.0
 
 Production overhaul into a deterministic attorney review workbench with modular source, structured rules, page-level provenance, hierarchy, comparison modes, reviewer adjudication, expanded exports, session persistence, and regression testing.

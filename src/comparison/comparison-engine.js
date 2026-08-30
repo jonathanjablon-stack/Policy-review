@@ -52,9 +52,9 @@
         concept: (r || l).title,
         category: (r || l).category,
         leftLanguage: lo ? lo.operativeLanguage : "Not located in extractable text",
-        leftSource: lo ? { document: lo.sourceDocument, page: lo.page, section: lo.section } : null,
+        leftSource: lo ? { document: lo.sourceDocument, page: lo.page, section: lo.section, extractionMethod: lo.extractionMethod, ocrConfidence: lo.ocrConfidence } : null,
         rightLanguage: ro ? ro.operativeLanguage : "Not located in extractable text",
-        rightSource: ro ? { document: ro.sourceDocument, page: ro.page, section: ro.section } : null,
+        rightSource: ro ? { document: ro.sourceDocument, page: ro.page, section: ro.section, extractionMethod: ro.extractionMethod, ocrConfidence: ro.ocrConfidence } : null,
         nature,
         similarity: Number(score.toFixed(3)),
         consequence,
@@ -105,7 +105,7 @@
     const paired = compareAnalyses(left, right, mode);
     return Object.assign(paired, {
       schemaVersion: "1.0.0",
-      engineVersion: "16.0.0",
+      engineVersion: "16.1.0",
       financialTerms: compareFinancialFacts(left.facts, right.facts),
       caution: mode === "proposal-policy" ? "Proposal, quote, and binder language is tracked separately from binding issued-policy language." : mode === "renewal" ? "Premium movement and retained-risk movement are reported separately." : "A confirmed difference requires actual paired language; a missing indicator alone is not a confirmed gap."
     });

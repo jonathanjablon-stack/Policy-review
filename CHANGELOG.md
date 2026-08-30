@@ -1,5 +1,30 @@
 # Changelog
 
+## 16.1.0 - 2026-08-30
+
+### Added
+
+- Automatic page-level OCR when native PDF text is blank, sparse, garbled, or symbol-heavy
+- Reviewer option to OCR every PDF page and retain the stronger native or OCR result
+- Repository-local Tesseract.js 7.0.0 worker, WebAssembly cores, and English language model
+- Repository-local PDF.js 5.6.205 parsing and rendering assets
+- OCR progress, confidence, render DPI, elapsed-time, selection, and error provenance
+- OCR provenance in facts, findings, hierarchy events, source views, saved sessions, Word reports, and the standalone Excel matrix
+- OCR quality-gate, selection, provenance, failure, runtime-asset, and no-remote-endpoint tests
+- Reproducible offline ZIP with asset-integrity manifest and third-party notices
+
+### Changed
+
+- Unreadable-page warnings now represent pages that remain unresolved after automatic OCR
+- OCR-sourced findings receive confidence adjustments when page confidence is below 80 percent
+- PDF parsing no longer depends on a CDN
+- Saved-session schema advanced to 1.1.0 while retaining v1.0.0 read compatibility
+
+### Preserved
+
+- The v16.0.0 HTML release remains under `dist/` for rollback
+- OCR never turns an unreadable page into a reviewed page unless usable text is actually recovered
+
 ## 16.0.0 - 2026-08-30
 
 ### Added

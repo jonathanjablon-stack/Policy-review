@@ -61,6 +61,10 @@
 
   function confidenceFor(rule, match, clause) {
     const exact = match[0].trim().split(/\s+/).length >= 2;
+    if (clause.extractionMethod === "ocr" && Number.isFinite(clause.ocrConfidence)) {
+      if (clause.ocrConfidence < 60) return { level: "Low", rationale: `The indicator came from local OCR with ${clause.ocrConfidence}% page confidence and requires source-image confirmation.` };
+      if (clause.ocrConfidence < 80) return { level: "Moderate", rationale: `The indicator came from local OCR with ${clause.ocrConfidence}% page confidence and should be checked against the rendered page.` };
+    }
     if (exact && clause.text.length <= 1800) return { level: "High", rationale: "A multi-word rule indicator appears in a bounded operative clause." };
     if (exact) return { level: "Moderate", rationale: "A rule indicator appears in a long clause that requires contextual review." };
     return { level: "Low", rationale: "A short indicator appears and may be ambiguous outside its full provision." };
@@ -97,7 +101,10 @@
                 hierarchyStatus: "current",
                 supersededBy: null,
                 confidence: confidence.level,
-                confidenceRationale: confidence.rationale
+                confidenceRationale: confidence.rationale,
+                extractionMethod: clause.extractionMethod || "native",
+                ocrConfidence: Number.isFinite(clause.ocrConfidence) ? clause.ocrConfidence : null,
+                ocrAttempted: Boolean(clause.ocrAttempted)
               });
             }
             if (!match[0]) regex.lastIndex += 1;
@@ -129,7 +136,9 @@
               page: clause.page,
               section: clause.section,
               sourceText: clause.text,
-              confidence: match[1] ? "High" : "Moderate",
+              confidence: clause.extractionMethod === "ocr" && Number.isFinite(clause.ocrConfidence) && clause.ocrConfidence < 80 ? "Moderate" : match[1] ? "High" : "Moderate",
+              extractionMethod: clause.extractionMethod || "native",
+              ocrConfidence: Number.isFinite(clause.ocrConfidence) ? clause.ocrConfidence : null,
               reviewerValue: null,
               reviewerStatus: "Unreviewed"
             });
@@ -173,6 +182,9 @@
           originalLanguage: pair ? pair[1].trim() : null,
           replacementLanguage: pair ? pair[2].trim() : null,
           modifyingLanguage: clause.text,
+          extractionMethod: clause.extractionMethod || "native",
+          ocrConfidence: Number.isFinite(clause.ocrConfidence) ? clause.ocrConfidence : null,
+          ocrAttempted: Boolean(clause.ocrAttempted),
           confidence: affectedRuleIds.length ? "Moderate" : "Low",
           rationale: affectedRuleIds.length ? "The modifying clause contains an indicator for the affected concept." : "A hierarchy verb is present, but the affected concept could not be mapped deterministically."
         });
@@ -255,7 +267,7 @@
         concept: rule.title,
         category: rule.category,
         status,
-        rationale: found.length ? `${found.length} current occurrence(s) retained with provenance.` : superseded.length ? "Only superseded language was located." : unreadable ? "No current occurrence was located, and one or more pages require OCR or manual inspection." : "No indicator was located in the extractable text. This is not a legal conclusion or a confirmed gap.",
+        rationale: found.length ? `${found.length} current occurrence(s) retained with provenance.` : superseded.length ? "Only superseded language was located." : unreadable ? "No current occurrence was located, and one or more pages remained unreadable after automatic local OCR." : "No indicator was located in the extractable text. This is not a legal conclusion or a confirmed gap.",
         searchedFor: rule.positiveIndicators,
         occurrences: found.map(o => ({ document: o.sourceDocument, page: o.page, section: o.section }))
       };
@@ -289,7 +301,7 @@
     const completeness = completenessMatrix(rules, occurrences, ordered);
     return {
       schemaVersion: "1.0.0",
-      engineVersion: "16.0.0",
+      engineVersion: "16.1.0",
       ruleLibraryVersion: ruleLibrary.version || "unknown",
       mode: mode || "standalone",
       createdAt: new Date().toISOString(),

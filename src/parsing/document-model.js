@@ -43,7 +43,7 @@
     });
     const repeated = new Set(Array.from(counts).filter(([, n]) => n / pages.length >= 0.6).map(([x]) => x));
     return pages.map(page => ({
-      number: page.number,
+      ...page,
       text: page.text.split("\n").filter(line => !repeated.has(lineFingerprint(line))).join("\n").trim(),
       originalText: page.originalText
     }));
@@ -52,8 +52,33 @@
   function pageHealth(page) {
     const letters = (page.text.match(/[A-Za-z]/g) || []).length;
     const replacement = (page.text.match(/\ufffd/g) || []).length;
-    const status = letters < 20 ? "Unreadable or image-only" : letters < 100 ? "Low extractable text" : replacement > Math.max(3, letters * 0.02) ? "Encoding concerns" : "Readable";
-    return { page: page.number, status, extractableCharacters: letters, requiresOCR: letters < 20 };
+    const ocr = page.ocr || {};
+    let status;
+    if (ocr.error && letters < 20) status = "OCR failed";
+    else if (letters < 20) status = ocr.attempted ? "Unreadable after OCR" : "Unreadable or image-only";
+    else if (letters < 100) status = ocr.attempted ? "Low text after OCR" : "Low extractable text";
+    else if (replacement > Math.max(3, letters * 0.02)) status = "Encoding concerns";
+    else if (page.extractionMethod === "ocr") status = "Readable (OCR)";
+    else if (ocr.attempted) status = "Readable (native; OCR checked)";
+    else status = "Readable";
+    return {
+      page: page.number,
+      status,
+      extractableCharacters: letters,
+      requiresOCR: letters < 20,
+      requiresManualReview: letters < 20,
+      extractionMethod: page.extractionMethod || "native",
+      ocrAttempted: Boolean(ocr.attempted),
+      ocrUsed: Boolean(ocr.used),
+      ocrConfidence: Number.isFinite(ocr.confidence) ? ocr.confidence : null,
+      ocrReason: ocr.reason || null,
+      ocrError: ocr.error || null,
+      ocrEngine: ocr.engine || null,
+      ocrElapsedMs: Number.isFinite(ocr.elapsedMs) ? ocr.elapsedMs : null,
+      ocrRenderedDpi: Number.isFinite(ocr.renderedDpi) ? ocr.renderedDpi : null,
+      nativeCharacters: Number.isFinite(ocr.nativeCharacters) ? ocr.nativeCharacters : null,
+      ocrCharacters: Number.isFinite(ocr.ocrCharacters) ? ocr.ocrCharacters : null
+    };
   }
 
   function isHeading(line) {
@@ -84,7 +109,10 @@
           lineEnd: endLine,
           text,
           normalizedText: text.toLowerCase(),
-          hierarchySignal: CONTROL_RE.test(text)
+          hierarchySignal: CONTROL_RE.test(text),
+          extractionMethod: page.extractionMethod || "native",
+          ocrConfidence: page.ocr && Number.isFinite(page.ocr.confidence) ? page.ocr.confidence : null,
+          ocrAttempted: Boolean(page.ocr && page.ocr.attempted)
         });
       }
       buffer = [];
@@ -122,14 +150,25 @@
     const name = input.name || "Untitled document";
     const id = input.id || `doc-${Math.random().toString(36).slice(2, 10)}`;
     const rawPages = Array.isArray(input.pages) && input.pages.length
-      ? input.pages.map((p, i) => ({ number: p.number || i + 1, originalText: String(p.text || ""), text: normalizeText(p.text) }))
-      : normalizeText(input.text).split(/\f|\n\s*\[\[PAGE BREAK\]\]\s*\n/i).map((text, i) => ({ number: i + 1, originalText: text, text: normalizeText(text) }));
+      ? input.pages.map((p, i) => ({
+          ...p,
+          number: p.number || i + 1,
+          originalText: String(p.originalText == null ? p.text || "" : p.originalText),
+          nativeText: String(p.nativeText == null ? p.text || "" : p.nativeText),
+          text: normalizeText(p.text),
+          extractionMethod: p.extractionMethod || "native",
+          ocr: p.ocr || null
+        }))
+      : normalizeText(input.text).split(/\f|\n\s*\[\[PAGE BREAK\]\]\s*\n/i).map((text, i) => ({ number: i + 1, originalText: text, nativeText: text, text: normalizeText(text), extractionMethod: "manual", ocr: null }));
     const pages = removeRepeatedMargins(rawPages);
     const allText = pages.map(p => p.text).join("\n\n");
     const role = inferRole(name, allText, input.role);
     const clauses = pages.flatMap(page => segmentPage(page, id, name));
     const health = pages.map(pageHealth);
-    const unreadablePages = health.filter(x => x.requiresOCR).map(x => x.page);
+    const unreadablePages = health.filter(x => x.requiresManualReview).map(x => x.page);
+    const ocrAttemptedPages = health.filter(x => x.ocrAttempted).map(x => x.page);
+    const ocrPages = health.filter(x => x.ocrUsed).map(x => x.page);
+    const ocrFailedPages = health.filter(x => x.ocrError).map(x => x.page);
     return {
       id,
       name,
@@ -142,7 +181,16 @@
         status: unreadablePages.length ? "Review required" : "Readable",
         pages: health,
         unreadablePages,
-        warning: unreadablePages.length ? `Pages requiring OCR or manual inspection: ${unreadablePages.join(", ")}` : "No image-only pages detected from extracted text."
+        ocrAttemptedPages,
+        ocrPages,
+        ocrFailedPages,
+        warning: unreadablePages.length
+          ? `Pages still requiring manual inspection after automatic OCR: ${unreadablePages.join(", ")}`
+          : ocrPages.length
+            ? `Automatic local OCR supplied usable text for page(s): ${ocrPages.join(", ")}.`
+            : ocrAttemptedPages.length
+              ? `Automatic local OCR checked page(s) ${ocrAttemptedPages.join(", ")}; native extraction remained stronger.`
+              : "Native PDF text extraction was sufficient; OCR was not needed."
       }
     };
   }
