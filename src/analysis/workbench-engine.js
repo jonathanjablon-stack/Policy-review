@@ -35,6 +35,7 @@
     ["plan_mirroring", "Plan mirroring", "(plan mirroring|mirrors? the plan)"],
     ["no_new_laser", "No-new-laser protection", "(no new (?:laser|special risk limitation))"],
     ["rate_cap", "Rate-cap protection", "((?:renewal )?rate cap|rate increase shall not exceed[^\\n;]{0,50})"],
+    ["commission", "Quoted commission", "(?:quoted rate\\(s\\) include commission of|commission)[:\\s]*(\\d+(?:\\.\\d+)?\\s*%)"],
     ["reporting_threshold", "High-dollar reporting threshold", "(?:reporting threshold|report claims? (?:expected )?to exceed)[:\\s$]*([0-9][0-9,]*)"],
     ["notice_deadline", "Claim notice deadline", "(?:notice of claim|claim notice)[^\\n;]{0,60}?(\\d+\\s+(?:days?|months?))"],
     ["proof_deadline", "Proof-of-loss deadline", "(?:proof of loss|proof[- ]of[- ]loss)[^\\n;]{0,80}?(\\d+\\s+(?:days?|months?))"],
@@ -115,8 +116,86 @@
     return occurrences;
   }
 
-  function extractFacts(document) {
+  const TABLE_FACT_DEFINITIONS = [
+    { fieldId: "specific_attachment", label: "Specific attachment point", row: /annual specific deductible per individual/i, value: /\$\s*([0-9][0-9,]*(?:\.\d+)?)/g, suffix: "" },
+    { fieldId: "aggregating_specific", label: "Aggregating specific deductible", row: /aggregating specific(?: additional plan liability| deductible(?:\s*\(if applicable\))?)/i, value: /\$\s*([0-9][0-9,]*(?:\.\d+)?)/g, suffix: "" },
+    { fieldId: "commission", label: "Quoted commission", row: /quoted rate\(s\) include commission of/i, value: /([0-9]+(?:\.\d+)?)\s*%/g, suffix: "%" },
+    { fieldId: "rate_cap", label: "Rate-cap protection", row: /no new laser with rate cap/i, value: /([0-9]+(?:\.\d+)?)\s*%/g, suffix: "%" }
+  ];
+
+  function proposalColumnLabels(pageText) {
+    const labels = [];
+    if (/\bCurrent\b/i.test(pageText)) labels.push("Current");
+    const seen = new Set();
+    for (const match of pageText.matchAll(/Renewal Option\s+\d+/gi)) {
+      const label = match[0].replace(/\s+/g, " ").trim();
+      const key = label.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); labels.push(label); }
+    }
+    return labels;
+  }
+
+  function extractTabularFacts(document) {
     const facts = [];
+    document.pages.forEach(page => {
+      const columns = proposalColumnLabels(page.text);
+      page.text.split("\n").forEach(line => {
+        TABLE_FACT_DEFINITIONS.forEach(def => {
+          const rowMatch = def.row.exec(line);
+          def.row.lastIndex = 0;
+          if (!rowMatch) return;
+          const tail = line.slice(rowMatch.index + rowMatch[0].length);
+          const values = Array.from(tail.matchAll(def.value)).map(match => `${match[1]}${def.suffix}`);
+          def.value.lastIndex = 0;
+          values.forEach((value, index) => {
+            facts.push({
+              id: `fact-${document.id}-${def.fieldId}-table-${page.number}-${index + 1}`,
+              fieldId: def.fieldId,
+              label: def.label,
+              value,
+              contextLabel: columns[index] || null,
+              sourceDocument: document.name,
+              documentId: document.id,
+              page: page.number,
+              section: columns.length ? "Proposal option table" : "Tabular terms",
+              sourceText: line.trim(),
+              confidence: "High",
+              extractionMethod: page.extractionMethod || "native",
+              ocrConfidence: page.ocr && Number.isFinite(page.ocr.confidence) ? page.ocr.confidence : null,
+              reviewerValue: null,
+              reviewerStatus: "Unreviewed"
+            });
+          });
+        });
+        if (/specific attachment point per specific attachment point class/i.test(page.text)) {
+          const classMatch = line.trim().match(/^(Class\s+\d+|Unsegmented)\s+\$\s*([0-9][0-9,]*(?:\.\d+)?)/i);
+          if (classMatch) {
+            facts.push({
+              id: `fact-${document.id}-specific_attachment-class-${page.number}-${facts.length + 1}`,
+              fieldId: "specific_attachment",
+              label: "Specific attachment point",
+              value: classMatch[2],
+              contextLabel: classMatch[1],
+              sourceDocument: document.name,
+              documentId: document.id,
+              page: page.number,
+              section: "Specific coverage schedule",
+              sourceText: line.trim(),
+              confidence: "High",
+              extractionMethod: page.extractionMethod || "native",
+              ocrConfidence: page.ocr && Number.isFinite(page.ocr.confidence) ? page.ocr.confidence : null,
+              reviewerValue: null,
+              reviewerStatus: "Unreviewed"
+            });
+          }
+        }
+      });
+    });
+    return facts;
+  }
+
+  function extractFacts(document) {
+    const facts = extractTabularFacts(document);
     FACT_DEFINITIONS.forEach(def => {
       const regex = compile(def.pattern, def.flags);
       if (!regex) return;
@@ -125,12 +204,13 @@
         let match;
         while ((match = regex.exec(clause.text)) !== null) {
           const value = String(match[1] || match[0]).replace(/\s+/g, " ").trim().replace(/[.,;:]$/, "");
-          if (value && !facts.some(f => f.fieldId === def.id && f.value.toLowerCase() === value.toLowerCase() && f.documentId === document.id)) {
+          if (value && !facts.some(f => f.fieldId === def.id && f.value.toLowerCase() === value.toLowerCase() && f.documentId === document.id && f.page === clause.page)) {
             facts.push({
               id: `fact-${document.id}-${def.id}-${facts.length + 1}`,
               fieldId: def.id,
               label: def.label,
               value,
+              contextLabel: null,
               sourceDocument: document.name,
               documentId: document.id,
               page: clause.page,
@@ -155,19 +235,99 @@
     return found ? found[0] : null;
   }
 
+  function affectedRuleIds(text, rules) {
+    return rules.filter(rule => (rule.detection.patterns || []).some(pattern => {
+      const regex = compile(pattern, "i");
+      return regex && regex.test(text);
+    })).map(rule => rule.id);
+  }
+
+  function normalizeHierarchyLanguage(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/docusign envelope id:[^\n]*/g, " ")
+      .replace(/[^a-z0-9$%]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function modificationPairs(document, rules, startingIndex) {
+    const joined = document.pages.map(page => page.text).join("\n\n");
+    const pageStarts = [];
+    let cursor = 0;
+    document.pages.forEach((page, index) => {
+      pageStarts.push({ page: page.number, start: cursor, end: cursor + page.text.length });
+      cursor += page.text.length + (index < document.pages.length - 1 ? 2 : 0);
+    });
+    const pattern = /\bREMOVE(?:\s+COLUMN HEADERS)?\s*:\s*([\s\S]*?)\s*\bAND REPLACE WITH\s*:\s*([\s\S]*?)(?=\s*\bREMOVE(?:\s+COLUMN HEADERS)?\s*:|$)/gi;
+    const pairs = [];
+    let match;
+    while ((match = pattern.exec(joined)) !== null) {
+      const originalLanguage = match[1].trim();
+      const replacementLanguage = match[2]
+        .replace(/\bAll other items contained within[\s\S]*$/i, "")
+        .replace(/\bPlan Sponsor Signature[\s\S]*$/i, "")
+        .trim();
+      if (!originalLanguage || !replacementLanguage) continue;
+      const page = (pageStarts.find(item => match.index >= item.start && match.index <= item.end) || pageStarts[0] || { page: 1 }).page;
+      const mapped = affectedRuleIds(`${originalLanguage}\n${replacementLanguage}`, rules);
+      pairs.push({
+        id: `hier-${startingIndex + pairs.length + 1}`,
+        documentId: document.id,
+        sourceDocument: document.name,
+        documentRole: document.role,
+        sequence: document.sequence,
+        page,
+        section: "Explicit REMOVE / REPLACE",
+        action: "replace",
+        affectedRuleIds: mapped,
+        originalLanguage,
+        replacementLanguage,
+        modifyingLanguage: match[0].trim(),
+        extractionMethod: document.pages.find(item => item.number === page)?.extractionMethod || "native",
+        ocrConfidence: document.pages.find(item => item.number === page)?.ocr && Number.isFinite(document.pages.find(item => item.number === page).ocr.confidence) ? document.pages.find(item => item.number === page).ocr.confidence : null,
+        ocrAttempted: Boolean(document.pages.find(item => item.number === page)?.ocr && document.pages.find(item => item.number === page).ocr.attempted),
+        confidence: "High",
+        rationale: "An explicit REMOVE / AND REPLACE WITH pair was preserved verbatim.",
+        status: "current",
+        supersededBy: null,
+        supersedesEventId: null
+      });
+    }
+    return pairs;
+  }
+
+  function linkModificationSequence(events) {
+    const ordered = events.slice().sort((a, b) => a.sequence - b.sequence || a.page - b.page);
+    ordered.forEach((later, laterIndex) => {
+      const target = normalizeHierarchyLanguage(later.originalLanguage);
+      if (!target) return;
+      for (let index = laterIndex - 1; index >= 0; index -= 1) {
+        const prior = ordered[index];
+        if (prior.documentId === later.documentId || prior.sequence >= later.sequence || prior.status === "superseded") continue;
+        if (normalizeHierarchyLanguage(prior.replacementLanguage) === target) {
+          prior.status = "superseded";
+          prior.supersededBy = later.id;
+          later.supersedesEventId = prior.id;
+          break;
+        }
+      }
+    });
+    return events;
+  }
+
   function hierarchyEvents(documents, rules) {
     const events = [];
     documents.forEach(document => {
+      const pairs = modificationPairs(document, rules, events.length);
+      if (pairs.length) {
+        events.push(...pairs);
+        return;
+      }
       document.clauses.filter(c => c.hierarchySignal || /amendment|endorsement|schedule/i.test(c.section)).forEach(clause => {
         const action = actionFor(clause.text);
         if (!action) return;
-        const affectedRuleIds = [];
-        rules.forEach(rule => {
-          if ((rule.detection.patterns || []).some(pattern => {
-            const regex = compile(pattern, "i");
-            return regex && regex.test(clause.text);
-          })) affectedRuleIds.push(rule.id);
-        });
+        const mappedRuleIds = affectedRuleIds(clause.text, rules);
         const pair = clause.text.match(/\b(?:REMOVE|DELETE|STRIKE)\b[:\s]+(.{1,900}?)\b(?:AND REPLACE WITH|REPLACE WITH|ADD)\b[:\s]+(.{1,1400})/i);
         events.push({
           id: `hier-${events.length + 1}`,
@@ -178,19 +338,22 @@
           page: clause.page,
           section: clause.section,
           action,
-          affectedRuleIds,
+          affectedRuleIds: mappedRuleIds,
           originalLanguage: pair ? pair[1].trim() : null,
           replacementLanguage: pair ? pair[2].trim() : null,
           modifyingLanguage: clause.text,
           extractionMethod: clause.extractionMethod || "native",
           ocrConfidence: Number.isFinite(clause.ocrConfidence) ? clause.ocrConfidence : null,
           ocrAttempted: Boolean(clause.ocrAttempted),
-          confidence: affectedRuleIds.length ? "Moderate" : "Low",
-          rationale: affectedRuleIds.length ? "The modifying clause contains an indicator for the affected concept." : "A hierarchy verb is present, but the affected concept could not be mapped deterministically."
+          confidence: mappedRuleIds.length ? "Moderate" : "Low",
+          rationale: mappedRuleIds.length ? "The modifying clause contains an indicator for the affected concept." : "A hierarchy verb is present, but the affected concept could not be mapped deterministically.",
+          status: "current",
+          supersededBy: null,
+          supersedesEventId: null
         });
       });
     });
-    return events;
+    return linkModificationSequence(events);
   }
 
   function applyHierarchy(occurrences, events) {
@@ -316,8 +479,12 @@
 
   return {
     FACT_DEFINITIONS,
+    TABLE_FACT_DEFINITIONS,
     analyzeDocument,
+    extractTabularFacts,
     extractFacts,
+    modificationPairs,
+    linkModificationSequence,
     hierarchyEvents,
     applyHierarchy,
     buildFindings,

@@ -2,7 +2,7 @@
 
 ## v16.1.0
 
-Added automatic repository-local OCR for PDF pages with inadequate native text. The release vendors PDF.js 5.6.205, Tesseract.js 7.0.0, compatible WebAssembly cores, and the English model; reuses one lazy worker; retains OCR provenance and confidence throughout analysis and export; verifies asset and package integrity; and ships a reproducible offline ZIP.
+Added automatic repository-local OCR for PDF pages with inadequate native text. The release vendors PDF.js 5.6.205, Tesseract.js 7.0.0, compatible WebAssembly cores, and the English model; reuses one lazy worker; retains OCR provenance and confidence throughout analysis and export; preserves labeled proposal options and exact amendment replacement chains; verifies the mandatory actual-document calibration, asset integrity, and package integrity; and ships a reproducible offline ZIP.
 
 ## v16.0.0
 

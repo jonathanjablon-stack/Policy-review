@@ -6,6 +6,7 @@
 node --test tests/*.test.js
 node scripts/build.js
 node scripts/verify-build.js
+npm run calibrate:corpus -- --corpus-dir /absolute/path/to/materialized-corpus
 ```
 
 ## Test layers
@@ -16,10 +17,10 @@ node scripts/verify-build.js
 | OCR provenance | Page health, engine metadata, confidence propagation, finding-confidence adjustment, and unresolved failures |
 | OCR runtime assets | Local API, worker, three compatible WebAssembly cores, English model, licenses, and no remote recognition endpoint |
 | Rule schema | Stable IDs, required metadata, regex compilation, uniqueness, and minimum library size |
-| Parsing | Page boundaries, headings, hyphenation, repeated margins, roles, provenance, and unreadable-page warnings |
+| Parsing | PDF row reconstruction, page boundaries, headings, hyphenation, repeated margins, roles, provenance, proposal option tables, and unreadable-page warnings |
 | Analysis | Multiple occurrences, standalone classification, facts, hierarchy, completeness, and summaries |
 | Comparison | Concept pairing, proposal/final distinction, mode columns, semantic change, and financial deltas |
-| Calibration | Crowne-derived financial and endorsement propositions; Palmetto-style remove/replace sequences |
+| Calibration | Synthetic Crowne and Palmetto propositions plus a separate actual-document run over 162 PDF pages and the attorney analysis |
 | Held-out | Underwriting, enforcement, and medical scenarios not used for rule-specific metadata |
 | Negative controls | Targeted Medicare, arbitration/mediation, and confirmed-gap false-positive controls |
 | Static security | No raw `innerHTML` assignment for source text, no telemetry/AI endpoints, required workflows and exports |
@@ -27,18 +28,19 @@ node scripts/verify-build.js
 
 ## Latest verified run
 
-- Automated tests: 43 passed, 0 failed
+- Automated tests: 46 passed, 0 failed
 - Curated positive expectations: 44 of 44 located across development and held-out fixtures
 - Targeted negative expectations: 4 of 4 avoided
-- Crowne financial calibration: $175,000 to $300,000 = 71.4%; $150,000 to $200,000 = 33.3%
-- Hierarchy: base exclusion supersession, unmapped hierarchy visibility, and remove/replace language all passed
+- Actual Crowne financial calibration: both proposals produced $175,000 to $300,000 = 71.4% and $150,000 to $200,000 = 33.3%; 0% and 10% commission variants remained separate
+- Actual Palmetto hierarchy: seven explicit replacement pairs preserved, two exact later replacements marked earlier language superseded, and five unrelated replacements remained current
+- Actual corpus parsing: 162 PDF pages had usable native text; the OCR quality gate identified four sparse or image-heavy pages for automatic OCR
 - Rules: 136 unique IDs with required metadata and compilable detection patterns
 - OCR runtime: generated stop-loss page recognized at 95 percent confidence with every required field recovered through Tesseract.js 7.0.0 and the bundled core/model
 - Vendor assets: 209 file hashes and byte counts verified
-- Production HTML: 3 byte-identical files, 130,323 bytes, SHA-256 `e11ccf22af25260f0535fd1d9d4b8f8544be40a69b0a374f0d200249b168ee8f`
-- Offline package: archive integrity and required entries passed; consecutive builds retained SHA-256 `64c8565eab317f7062a0e89f5e9885367f398f9b0a4e40607fbda159205a62a5`
+- Production HTML: 3 byte-identical files, 140,119 bytes, SHA-256 `93be632ba97e2dac616b6c0ad19bf29eb57cb810c7e1110df55a95e0130392fd`
+- Offline package: archive integrity and required entries passed; consecutive builds retained SHA-256 `ed95edab9d68b74858e3eae25942cac83d12603251732442e1aa7f8ef674db40`
 
-The fixture corpus is deliberately small and proposition-focused. These results are regression evidence, not a claim of population-level precision or legal accuracy.
+The automated fixture corpus is deliberately small and proposition-focused. The separate actual-document calibration closes the required release scenarios, but neither result is a claim of population-level precision or legal accuracy.
 
 ## Manual acceptance checklist
 

@@ -526,6 +526,21 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
       .trim();
   }
 
+  function reconstructPdfLines(items) {
+    const lines = [];
+    (items || []).forEach(item => {
+      const y = item.transform && item.transform[5] || 0;
+      let line = lines.find(candidate => Math.abs(candidate.y - y) < 2.5);
+      if (!line) { line = { y, items: [] }; lines.push(line); }
+      line.items.push({ x: item.transform && item.transform[4] || 0, text: item.str || "" });
+    });
+    return lines
+      .sort((a, b) => b.y - a.y)
+      .map(line => line.items.sort((a, b) => a.x - b.x).map(item => item.text).join(" ").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+
   function inferRole(name, text, suppliedRole) {
     if (suppliedRole) return suppliedRole;
     const sample = `${name}\n${text.slice(0, 3000)}`;
@@ -702,7 +717,7 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
     };
   }
 
-  return { normalizeText, inferRole, removeRepeatedMargins, segmentPage, parseDocument, isHeading };
+  return { normalizeText, reconstructPdfLines, inferRole, removeRepeatedMargins, segmentPage, parseDocument, isHeading };
 });
 
 </script>
@@ -962,6 +977,7 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
     ["plan_mirroring", "Plan mirroring", "(plan mirroring|mirrors? the plan)"],
     ["no_new_laser", "No-new-laser protection", "(no new (?:laser|special risk limitation))"],
     ["rate_cap", "Rate-cap protection", "((?:renewal )?rate cap|rate increase shall not exceed[^\\n;]{0,50})"],
+    ["commission", "Quoted commission", "(?:quoted rate\\(s\\) include commission of|commission)[:\\s]*(\\d+(?:\\.\\d+)?\\s*%)"],
     ["reporting_threshold", "High-dollar reporting threshold", "(?:reporting threshold|report claims? (?:expected )?to exceed)[:\\s$]*([0-9][0-9,]*)"],
     ["notice_deadline", "Claim notice deadline", "(?:notice of claim|claim notice)[^\\n;]{0,60}?(\\d+\\s+(?:days?|months?))"],
     ["proof_deadline", "Proof-of-loss deadline", "(?:proof of loss|proof[- ]of[- ]loss)[^\\n;]{0,80}?(\\d+\\s+(?:days?|months?))"],
@@ -1042,8 +1058,86 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
     return occurrences;
   }
 
-  function extractFacts(document) {
+  const TABLE_FACT_DEFINITIONS = [
+    { fieldId: "specific_attachment", label: "Specific attachment point", row: /annual specific deductible per individual/i, value: /\$\s*([0-9][0-9,]*(?:\.\d+)?)/g, suffix: "" },
+    { fieldId: "aggregating_specific", label: "Aggregating specific deductible", row: /aggregating specific(?: additional plan liability| deductible(?:\s*\(if applicable\))?)/i, value: /\$\s*([0-9][0-9,]*(?:\.\d+)?)/g, suffix: "" },
+    { fieldId: "commission", label: "Quoted commission", row: /quoted rate\(s\) include commission of/i, value: /([0-9]+(?:\.\d+)?)\s*%/g, suffix: "%" },
+    { fieldId: "rate_cap", label: "Rate-cap protection", row: /no new laser with rate cap/i, value: /([0-9]+(?:\.\d+)?)\s*%/g, suffix: "%" }
+  ];
+
+  function proposalColumnLabels(pageText) {
+    const labels = [];
+    if (/\bCurrent\b/i.test(pageText)) labels.push("Current");
+    const seen = new Set();
+    for (const match of pageText.matchAll(/Renewal Option\s+\d+/gi)) {
+      const label = match[0].replace(/\s+/g, " ").trim();
+      const key = label.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); labels.push(label); }
+    }
+    return labels;
+  }
+
+  function extractTabularFacts(document) {
     const facts = [];
+    document.pages.forEach(page => {
+      const columns = proposalColumnLabels(page.text);
+      page.text.split("\n").forEach(line => {
+        TABLE_FACT_DEFINITIONS.forEach(def => {
+          const rowMatch = def.row.exec(line);
+          def.row.lastIndex = 0;
+          if (!rowMatch) return;
+          const tail = line.slice(rowMatch.index + rowMatch[0].length);
+          const values = Array.from(tail.matchAll(def.value)).map(match => `${match[1]}${def.suffix}`);
+          def.value.lastIndex = 0;
+          values.forEach((value, index) => {
+            facts.push({
+              id: `fact-${document.id}-${def.fieldId}-table-${page.number}-${index + 1}`,
+              fieldId: def.fieldId,
+              label: def.label,
+              value,
+              contextLabel: columns[index] || null,
+              sourceDocument: document.name,
+              documentId: document.id,
+              page: page.number,
+              section: columns.length ? "Proposal option table" : "Tabular terms",
+              sourceText: line.trim(),
+              confidence: "High",
+              extractionMethod: page.extractionMethod || "native",
+              ocrConfidence: page.ocr && Number.isFinite(page.ocr.confidence) ? page.ocr.confidence : null,
+              reviewerValue: null,
+              reviewerStatus: "Unreviewed"
+            });
+          });
+        });
+        if (/specific attachment point per specific attachment point class/i.test(page.text)) {
+          const classMatch = line.trim().match(/^(Class\s+\d+|Unsegmented)\s+\$\s*([0-9][0-9,]*(?:\.\d+)?)/i);
+          if (classMatch) {
+            facts.push({
+              id: `fact-${document.id}-specific_attachment-class-${page.number}-${facts.length + 1}`,
+              fieldId: "specific_attachment",
+              label: "Specific attachment point",
+              value: classMatch[2],
+              contextLabel: classMatch[1],
+              sourceDocument: document.name,
+              documentId: document.id,
+              page: page.number,
+              section: "Specific coverage schedule",
+              sourceText: line.trim(),
+              confidence: "High",
+              extractionMethod: page.extractionMethod || "native",
+              ocrConfidence: page.ocr && Number.isFinite(page.ocr.confidence) ? page.ocr.confidence : null,
+              reviewerValue: null,
+              reviewerStatus: "Unreviewed"
+            });
+          }
+        }
+      });
+    });
+    return facts;
+  }
+
+  function extractFacts(document) {
+    const facts = extractTabularFacts(document);
     FACT_DEFINITIONS.forEach(def => {
       const regex = compile(def.pattern, def.flags);
       if (!regex) return;
@@ -1052,12 +1146,13 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
         let match;
         while ((match = regex.exec(clause.text)) !== null) {
           const value = String(match[1] || match[0]).replace(/\s+/g, " ").trim().replace(/[.,;:]$/, "");
-          if (value && !facts.some(f => f.fieldId === def.id && f.value.toLowerCase() === value.toLowerCase() && f.documentId === document.id)) {
+          if (value && !facts.some(f => f.fieldId === def.id && f.value.toLowerCase() === value.toLowerCase() && f.documentId === document.id && f.page === clause.page)) {
             facts.push({
               id: `fact-${document.id}-${def.id}-${facts.length + 1}`,
               fieldId: def.id,
               label: def.label,
               value,
+              contextLabel: null,
               sourceDocument: document.name,
               documentId: document.id,
               page: clause.page,
@@ -1082,19 +1177,99 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
     return found ? found[0] : null;
   }
 
+  function affectedRuleIds(text, rules) {
+    return rules.filter(rule => (rule.detection.patterns || []).some(pattern => {
+      const regex = compile(pattern, "i");
+      return regex && regex.test(text);
+    })).map(rule => rule.id);
+  }
+
+  function normalizeHierarchyLanguage(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/docusign envelope id:[^\n]*/g, " ")
+      .replace(/[^a-z0-9$%]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function modificationPairs(document, rules, startingIndex) {
+    const joined = document.pages.map(page => page.text).join("\n\n");
+    const pageStarts = [];
+    let cursor = 0;
+    document.pages.forEach((page, index) => {
+      pageStarts.push({ page: page.number, start: cursor, end: cursor + page.text.length });
+      cursor += page.text.length + (index < document.pages.length - 1 ? 2 : 0);
+    });
+    const pattern = /\bREMOVE(?:\s+COLUMN HEADERS)?\s*:\s*([\s\S]*?)\s*\bAND REPLACE WITH\s*:\s*([\s\S]*?)(?=\s*\bREMOVE(?:\s+COLUMN HEADERS)?\s*:|$)/gi;
+    const pairs = [];
+    let match;
+    while ((match = pattern.exec(joined)) !== null) {
+      const originalLanguage = match[1].trim();
+      const replacementLanguage = match[2]
+        .replace(/\bAll other items contained within[\s\S]*$/i, "")
+        .replace(/\bPlan Sponsor Signature[\s\S]*$/i, "")
+        .trim();
+      if (!originalLanguage || !replacementLanguage) continue;
+      const page = (pageStarts.find(item => match.index >= item.start && match.index <= item.end) || pageStarts[0] || { page: 1 }).page;
+      const mapped = affectedRuleIds(`${originalLanguage}\n${replacementLanguage}`, rules);
+      pairs.push({
+        id: `hier-${startingIndex + pairs.length + 1}`,
+        documentId: document.id,
+        sourceDocument: document.name,
+        documentRole: document.role,
+        sequence: document.sequence,
+        page,
+        section: "Explicit REMOVE / REPLACE",
+        action: "replace",
+        affectedRuleIds: mapped,
+        originalLanguage,
+        replacementLanguage,
+        modifyingLanguage: match[0].trim(),
+        extractionMethod: document.pages.find(item => item.number === page)?.extractionMethod || "native",
+        ocrConfidence: document.pages.find(item => item.number === page)?.ocr && Number.isFinite(document.pages.find(item => item.number === page).ocr.confidence) ? document.pages.find(item => item.number === page).ocr.confidence : null,
+        ocrAttempted: Boolean(document.pages.find(item => item.number === page)?.ocr && document.pages.find(item => item.number === page).ocr.attempted),
+        confidence: "High",
+        rationale: "An explicit REMOVE / AND REPLACE WITH pair was preserved verbatim.",
+        status: "current",
+        supersededBy: null,
+        supersedesEventId: null
+      });
+    }
+    return pairs;
+  }
+
+  function linkModificationSequence(events) {
+    const ordered = events.slice().sort((a, b) => a.sequence - b.sequence || a.page - b.page);
+    ordered.forEach((later, laterIndex) => {
+      const target = normalizeHierarchyLanguage(later.originalLanguage);
+      if (!target) return;
+      for (let index = laterIndex - 1; index >= 0; index -= 1) {
+        const prior = ordered[index];
+        if (prior.documentId === later.documentId || prior.sequence >= later.sequence || prior.status === "superseded") continue;
+        if (normalizeHierarchyLanguage(prior.replacementLanguage) === target) {
+          prior.status = "superseded";
+          prior.supersededBy = later.id;
+          later.supersedesEventId = prior.id;
+          break;
+        }
+      }
+    });
+    return events;
+  }
+
   function hierarchyEvents(documents, rules) {
     const events = [];
     documents.forEach(document => {
+      const pairs = modificationPairs(document, rules, events.length);
+      if (pairs.length) {
+        events.push(...pairs);
+        return;
+      }
       document.clauses.filter(c => c.hierarchySignal || /amendment|endorsement|schedule/i.test(c.section)).forEach(clause => {
         const action = actionFor(clause.text);
         if (!action) return;
-        const affectedRuleIds = [];
-        rules.forEach(rule => {
-          if ((rule.detection.patterns || []).some(pattern => {
-            const regex = compile(pattern, "i");
-            return regex && regex.test(clause.text);
-          })) affectedRuleIds.push(rule.id);
-        });
+        const mappedRuleIds = affectedRuleIds(clause.text, rules);
         const pair = clause.text.match(/\b(?:REMOVE|DELETE|STRIKE)\b[:\s]+(.{1,900}?)\b(?:AND REPLACE WITH|REPLACE WITH|ADD)\b[:\s]+(.{1,1400})/i);
         events.push({
           id: `hier-${events.length + 1}`,
@@ -1105,19 +1280,22 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
           page: clause.page,
           section: clause.section,
           action,
-          affectedRuleIds,
+          affectedRuleIds: mappedRuleIds,
           originalLanguage: pair ? pair[1].trim() : null,
           replacementLanguage: pair ? pair[2].trim() : null,
           modifyingLanguage: clause.text,
           extractionMethod: clause.extractionMethod || "native",
           ocrConfidence: Number.isFinite(clause.ocrConfidence) ? clause.ocrConfidence : null,
           ocrAttempted: Boolean(clause.ocrAttempted),
-          confidence: affectedRuleIds.length ? "Moderate" : "Low",
-          rationale: affectedRuleIds.length ? "The modifying clause contains an indicator for the affected concept." : "A hierarchy verb is present, but the affected concept could not be mapped deterministically."
+          confidence: mappedRuleIds.length ? "Moderate" : "Low",
+          rationale: mappedRuleIds.length ? "The modifying clause contains an indicator for the affected concept." : "A hierarchy verb is present, but the affected concept could not be mapped deterministically.",
+          status: "current",
+          supersededBy: null,
+          supersedesEventId: null
         });
       });
     });
-    return events;
+    return linkModificationSequence(events);
   }
 
   function applyHierarchy(occurrences, events) {
@@ -1243,8 +1421,12 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
 
   return {
     FACT_DEFINITIONS,
+    TABLE_FACT_DEFINITIONS,
     analyzeDocument,
+    extractTabularFacts,
     extractFacts,
+    modificationPairs,
+    linkModificationSequence,
     hierarchyEvents,
     applyHierarchy,
     buildFindings,
@@ -1331,30 +1513,52 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
   }
 
   function compareFinancialFacts(leftFacts, rightFacts) {
-    const financial = new Set(["specific_attachment", "alternate_attachment", "aggregating_specific", "aggregate_attachment", "specific_percentage", "aggregate_percentage", "maximums", "benefit_basis", "premium_grace", "rate_cap"]);
-    const firstById = list => {
+    const financial = new Set(["specific_attachment", "alternate_attachment", "aggregating_specific", "aggregate_attachment", "specific_percentage", "aggregate_percentage", "maximums", "benefit_basis", "premium_grace", "rate_cap", "commission"]);
+    const groupedById = list => {
       const map = new Map();
-      list.forEach(f => { if (!map.has(f.fieldId)) map.set(f.fieldId, f); });
+      list.forEach(fact => {
+        if (!financial.has(fact.fieldId)) return;
+        if (!map.has(fact.fieldId)) map.set(fact.fieldId, []);
+        const value = fact.reviewerValue || fact.value;
+        const key = `${String(value).toLowerCase()}|${String(fact.contextLabel || "").toLowerCase()}|${fact.documentId || fact.sourceDocument}|${fact.page}`;
+        if (!map.get(fact.fieldId).some(item => item.key === key)) map.get(fact.fieldId).push({ fact, value, key });
+      });
       return map;
     };
-    const left = firstById(leftFacts);
-    const right = firstById(rightFacts);
+    const left = groupedById(leftFacts);
+    const right = groupedById(rightFacts);
     const ids = Array.from(new Set([...left.keys(), ...right.keys()])).filter(id => financial.has(id));
-    return ids.map(id => {
-      const l = left.get(id) || null;
-      const r = right.get(id) || null;
-      const ln = numericValue(l && l.value);
-      const rn = numericValue(r && r.value);
-      const change = ln !== null && rn !== null && ln !== 0 ? ((rn - ln) / Math.abs(ln)) * 100 : null;
-      return {
+    return ids.flatMap(id => {
+      const leftItems = left.get(id) || [];
+      const rightItems = right.get(id) || [];
+      const candidates = rightItems.length ? rightItems : [null];
+      return candidates.map((rightItem, candidateIndex) => {
+        const context = rightItem && rightItem.fact.contextLabel;
+        const leftItem = leftItems.find(item => context && item.fact.contextLabel === context) || leftItems[0] || null;
+        const l = leftItem && leftItem.fact;
+        const r = rightItem && rightItem.fact;
+        const priorValue = leftItem ? leftItem.value : "Not located";
+        const currentValue = rightItem ? rightItem.value : "Not located";
+        const ln = numericValue(priorValue);
+        const rn = numericValue(currentValue);
+        const change = ln !== null && rn !== null && ln !== 0 ? ((rn - ln) / Math.abs(ln)) * 100 : null;
+        const interpretation = id === "specific_attachment" && change > 0 ? "Increased retained risk per covered person" : id === "aggregating_specific" && change > 0 ? "Increased retained aggregate-specific exposure" : change === 0 ? "No numeric change detected" : "Review the financial and contractual context";
+        let warning = null;
+        if (id === "commission") warning = "Commission changes are pricing assumptions and must not be blended into retained-risk movement.";
+        else if (rightItems.length > 1) warning = "This is one candidate option from a multi-option document; no option is treated as selected without reviewer confirmation.";
+        return {
         fieldId: id,
-        label: (r || l).label,
-        priorValue: l ? l.value : "Not located",
-        currentValue: r ? r.value : "Not located",
+        label: `${(r || l).label}${context ? ` - ${context}` : rightItems.length > 1 ? ` - candidate ${candidateIndex + 1}` : ""}`,
+        contextLabel: context || null,
+        priorValue,
+        currentValue,
         percentChange: change === null ? null : Number(change.toFixed(1)),
-        interpretation: id === "specific_attachment" && change > 0 ? "Increased retained risk per covered person" : id === "aggregating_specific" && change > 0 ? "Increased retained aggregate-specific exposure" : change === 0 ? "No numeric change detected" : "Review the financial and contractual context",
-        warning: /premium|commission/.test(id) ? "Normalize commission assumptions before comparing premium." : null
+        interpretation,
+        warning,
+        priorSource: l ? { document: l.sourceDocument, page: l.page, contextLabel: l.contextLabel || null } : null,
+        currentSource: r ? { document: r.sourceDocument, page: r.page, contextLabel: r.contextLabel || null } : null
       };
+      });
     });
   }
 
@@ -1473,17 +1677,6 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
     ui.busyMessage.textContent = `${update.documentName || "PDF"}: local OCR ${page}, ${update.status || "working"}${percent}`;
   }
 
-  function reconstructPdfLines(items) {
-    const lines = [];
-    items.forEach(item => {
-      const y = item.transform && item.transform[5] || 0;
-      let line = lines.find(candidate => Math.abs(candidate.y - y) < 2.5);
-      if (!line) { line = { y, items: [] }; lines.push(line); }
-      line.items.push({ x: item.transform && item.transform[4] || 0, text: item.str || "" });
-    });
-    return lines.sort((a, b) => b.y - a.y).map(line => line.items.sort((a, b) => a.x - b.x).map(x => x.text).join(" ").replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
-  }
-
   async function readPdf(file, ocrSession, forceAllPages) {
     const pdfjs = await getPdfJs();
     const loadingTask = pdfjs.getDocument({
@@ -1500,7 +1693,7 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
         ui.busyMessage.textContent = `${file.name}: extracting page ${pageNumber} of ${pdf.numPages}`;
         const page = await pdf.getPage(pageNumber);
         const content = await page.getTextContent();
-        const nativeText = reconstructPdfLines(content.items);
+        const nativeText = DocumentModel.reconstructPdfLines(content.items);
         const decision = OcrEngine.shouldOcrPage(nativeText, { forceAllPages });
         let selected = { text: nativeText, method: "native", ocrUsed: false, nativeQuality: decision.nativeQuality, ocrQuality: null, ocrConfidence: null, selectionReason: "Native PDF extraction passed the text-quality threshold." };
         let ocrResult = null;
@@ -1749,7 +1942,7 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
     const events = sessionAnalyses().flatMap(a => a.hierarchyEvents);
     const box = element("article", { class: "card" }, [element("h3", { text: "Document hierarchy and amendment events" }), element("p", { text: "The workbench marks superseded language only where a modifying clause and affected concept can be linked deterministically. Unmapped hierarchy language remains visible for attorney review." })]);
     const list = element("div", { class: "findings-list" });
-    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: "badge Moderate", text: event.action }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: event.action, operativeLanguage: event.modifyingLanguage, extractionMethod: event.extractionMethod, ocrConfidence: event.ocrConfidence }) })])])));
+    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: `badge ${event.status === "superseded" ? "Informational" : "Moderate"}`, text: `${event.action} | ${event.status || "current"}` }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}${event.supersededBy ? ` Superseded by ${event.supersededBy}.` : ""}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: `${event.action} | ${event.status || "current"}`, operativeLanguage: event.modifyingLanguage, extractionMethod: event.extractionMethod, ocrConfidence: event.ocrConfidence }) })])])));
     if (!events.length) list.append(element("p", { text: "No explicit hierarchy events were mapped in extractable text." }));
     ui.sectionContent.append(box, list);
   }
@@ -1766,7 +1959,7 @@ dialog::backdrop { background: rgba(5, 21, 36, .65); }
 
   function renderFinancial() {
     const table = element("table"); table.append(element("thead", {}, element("tr", {}, ["Term", "Set A", "Set B", "Change", "Risk-transfer interpretation"].map(x => element("th", { text: x })))));
-    const body = element("tbody"); state.comparison.financialTerms.forEach(row => body.append(element("tr", {}, [element("td", { text: row.label }), element("td", { text: row.priorValue }), element("td", { text: row.currentValue }), element("td", { text: row.percentChange === null ? "Not calculated" : `${row.percentChange > 0 ? "+" : ""}${row.percentChange}%` }), element("td", { text: `${row.interpretation}${row.warning ? ` ${row.warning}` : ""}` })])));
+    const body = element("tbody"); state.comparison.financialTerms.forEach(row => body.append(element("tr", {}, [element("td", { text: row.label }), element("td", { text: `${row.priorValue}${row.priorSource ? ` (${row.priorSource.document}, p. ${row.priorSource.page})` : ""}` }), element("td", { text: `${row.currentValue}${row.currentSource ? ` (${row.currentSource.document}, p. ${row.currentSource.page})` : ""}` }), element("td", { text: row.percentChange === null ? "Not calculated" : `${row.percentChange > 0 ? "+" : ""}${row.percentChange}%` }), element("td", { text: `${row.interpretation}${row.warning ? ` ${row.warning}` : ""}` })])));
     table.append(body); ui.sectionContent.append(element("article", { class: "card" }, [element("h3", { text: "Financial-terms comparison" }), element("p", { text: "Premium and commission assumptions are separate from attachment-point and other retained-risk movement." })]), element("div", { class: "table-wrap" }, table));
   }
 

@@ -19,6 +19,21 @@
       .trim();
   }
 
+  function reconstructPdfLines(items) {
+    const lines = [];
+    (items || []).forEach(item => {
+      const y = item.transform && item.transform[5] || 0;
+      let line = lines.find(candidate => Math.abs(candidate.y - y) < 2.5);
+      if (!line) { line = { y, items: [] }; lines.push(line); }
+      line.items.push({ x: item.transform && item.transform[4] || 0, text: item.str || "" });
+    });
+    return lines
+      .sort((a, b) => b.y - a.y)
+      .map(line => line.items.sort((a, b) => a.x - b.x).map(item => item.text).join(" ").replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n");
+  }
+
   function inferRole(name, text, suppliedRole) {
     if (suppliedRole) return suppliedRole;
     const sample = `${name}\n${text.slice(0, 3000)}`;
@@ -195,5 +210,5 @@
     };
   }
 
-  return { normalizeText, inferRole, removeRepeatedMargins, segmentPage, parseDocument, isHeading };
+  return { normalizeText, reconstructPdfLines, inferRole, removeRepeatedMargins, segmentPage, parseDocument, isHeading };
 });

@@ -74,30 +74,52 @@
   }
 
   function compareFinancialFacts(leftFacts, rightFacts) {
-    const financial = new Set(["specific_attachment", "alternate_attachment", "aggregating_specific", "aggregate_attachment", "specific_percentage", "aggregate_percentage", "maximums", "benefit_basis", "premium_grace", "rate_cap"]);
-    const firstById = list => {
+    const financial = new Set(["specific_attachment", "alternate_attachment", "aggregating_specific", "aggregate_attachment", "specific_percentage", "aggregate_percentage", "maximums", "benefit_basis", "premium_grace", "rate_cap", "commission"]);
+    const groupedById = list => {
       const map = new Map();
-      list.forEach(f => { if (!map.has(f.fieldId)) map.set(f.fieldId, f); });
+      list.forEach(fact => {
+        if (!financial.has(fact.fieldId)) return;
+        if (!map.has(fact.fieldId)) map.set(fact.fieldId, []);
+        const value = fact.reviewerValue || fact.value;
+        const key = `${String(value).toLowerCase()}|${String(fact.contextLabel || "").toLowerCase()}|${fact.documentId || fact.sourceDocument}|${fact.page}`;
+        if (!map.get(fact.fieldId).some(item => item.key === key)) map.get(fact.fieldId).push({ fact, value, key });
+      });
       return map;
     };
-    const left = firstById(leftFacts);
-    const right = firstById(rightFacts);
+    const left = groupedById(leftFacts);
+    const right = groupedById(rightFacts);
     const ids = Array.from(new Set([...left.keys(), ...right.keys()])).filter(id => financial.has(id));
-    return ids.map(id => {
-      const l = left.get(id) || null;
-      const r = right.get(id) || null;
-      const ln = numericValue(l && l.value);
-      const rn = numericValue(r && r.value);
-      const change = ln !== null && rn !== null && ln !== 0 ? ((rn - ln) / Math.abs(ln)) * 100 : null;
-      return {
+    return ids.flatMap(id => {
+      const leftItems = left.get(id) || [];
+      const rightItems = right.get(id) || [];
+      const candidates = rightItems.length ? rightItems : [null];
+      return candidates.map((rightItem, candidateIndex) => {
+        const context = rightItem && rightItem.fact.contextLabel;
+        const leftItem = leftItems.find(item => context && item.fact.contextLabel === context) || leftItems[0] || null;
+        const l = leftItem && leftItem.fact;
+        const r = rightItem && rightItem.fact;
+        const priorValue = leftItem ? leftItem.value : "Not located";
+        const currentValue = rightItem ? rightItem.value : "Not located";
+        const ln = numericValue(priorValue);
+        const rn = numericValue(currentValue);
+        const change = ln !== null && rn !== null && ln !== 0 ? ((rn - ln) / Math.abs(ln)) * 100 : null;
+        const interpretation = id === "specific_attachment" && change > 0 ? "Increased retained risk per covered person" : id === "aggregating_specific" && change > 0 ? "Increased retained aggregate-specific exposure" : change === 0 ? "No numeric change detected" : "Review the financial and contractual context";
+        let warning = null;
+        if (id === "commission") warning = "Commission changes are pricing assumptions and must not be blended into retained-risk movement.";
+        else if (rightItems.length > 1) warning = "This is one candidate option from a multi-option document; no option is treated as selected without reviewer confirmation.";
+        return {
         fieldId: id,
-        label: (r || l).label,
-        priorValue: l ? l.value : "Not located",
-        currentValue: r ? r.value : "Not located",
+        label: `${(r || l).label}${context ? ` - ${context}` : rightItems.length > 1 ? ` - candidate ${candidateIndex + 1}` : ""}`,
+        contextLabel: context || null,
+        priorValue,
+        currentValue,
         percentChange: change === null ? null : Number(change.toFixed(1)),
-        interpretation: id === "specific_attachment" && change > 0 ? "Increased retained risk per covered person" : id === "aggregating_specific" && change > 0 ? "Increased retained aggregate-specific exposure" : change === 0 ? "No numeric change detected" : "Review the financial and contractual context",
-        warning: /premium|commission/.test(id) ? "Normalize commission assumptions before comparing premium." : null
+        interpretation,
+        warning,
+        priorSource: l ? { document: l.sourceDocument, page: l.page, contextLabel: l.contextLabel || null } : null,
+        currentSource: r ? { document: r.sourceDocument, page: r.page, contextLabel: r.contextLabel || null } : null
       };
+      });
     });
   }
 

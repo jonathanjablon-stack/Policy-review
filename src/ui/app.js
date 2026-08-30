@@ -98,17 +98,6 @@
     ui.busyMessage.textContent = `${update.documentName || "PDF"}: local OCR ${page}, ${update.status || "working"}${percent}`;
   }
 
-  function reconstructPdfLines(items) {
-    const lines = [];
-    items.forEach(item => {
-      const y = item.transform && item.transform[5] || 0;
-      let line = lines.find(candidate => Math.abs(candidate.y - y) < 2.5);
-      if (!line) { line = { y, items: [] }; lines.push(line); }
-      line.items.push({ x: item.transform && item.transform[4] || 0, text: item.str || "" });
-    });
-    return lines.sort((a, b) => b.y - a.y).map(line => line.items.sort((a, b) => a.x - b.x).map(x => x.text).join(" ").replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
-  }
-
   async function readPdf(file, ocrSession, forceAllPages) {
     const pdfjs = await getPdfJs();
     const loadingTask = pdfjs.getDocument({
@@ -125,7 +114,7 @@
         ui.busyMessage.textContent = `${file.name}: extracting page ${pageNumber} of ${pdf.numPages}`;
         const page = await pdf.getPage(pageNumber);
         const content = await page.getTextContent();
-        const nativeText = reconstructPdfLines(content.items);
+        const nativeText = DocumentModel.reconstructPdfLines(content.items);
         const decision = OcrEngine.shouldOcrPage(nativeText, { forceAllPages });
         let selected = { text: nativeText, method: "native", ocrUsed: false, nativeQuality: decision.nativeQuality, ocrQuality: null, ocrConfidence: null, selectionReason: "Native PDF extraction passed the text-quality threshold." };
         let ocrResult = null;
@@ -374,7 +363,7 @@
     const events = sessionAnalyses().flatMap(a => a.hierarchyEvents);
     const box = element("article", { class: "card" }, [element("h3", { text: "Document hierarchy and amendment events" }), element("p", { text: "The workbench marks superseded language only where a modifying clause and affected concept can be linked deterministically. Unmapped hierarchy language remains visible for attorney review." })]);
     const list = element("div", { class: "findings-list" });
-    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: "badge Moderate", text: event.action }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: event.action, operativeLanguage: event.modifyingLanguage, extractionMethod: event.extractionMethod, ocrConfidence: event.ocrConfidence }) })])])));
+    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: `badge ${event.status === "superseded" ? "Informational" : "Moderate"}`, text: `${event.action} | ${event.status || "current"}` }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}${event.supersededBy ? ` Superseded by ${event.supersededBy}.` : ""}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: `${event.action} | ${event.status || "current"}`, operativeLanguage: event.modifyingLanguage, extractionMethod: event.extractionMethod, ocrConfidence: event.ocrConfidence }) })])])));
     if (!events.length) list.append(element("p", { text: "No explicit hierarchy events were mapped in extractable text." }));
     ui.sectionContent.append(box, list);
   }
@@ -391,7 +380,7 @@
 
   function renderFinancial() {
     const table = element("table"); table.append(element("thead", {}, element("tr", {}, ["Term", "Set A", "Set B", "Change", "Risk-transfer interpretation"].map(x => element("th", { text: x })))));
-    const body = element("tbody"); state.comparison.financialTerms.forEach(row => body.append(element("tr", {}, [element("td", { text: row.label }), element("td", { text: row.priorValue }), element("td", { text: row.currentValue }), element("td", { text: row.percentChange === null ? "Not calculated" : `${row.percentChange > 0 ? "+" : ""}${row.percentChange}%` }), element("td", { text: `${row.interpretation}${row.warning ? ` ${row.warning}` : ""}` })])));
+    const body = element("tbody"); state.comparison.financialTerms.forEach(row => body.append(element("tr", {}, [element("td", { text: row.label }), element("td", { text: `${row.priorValue}${row.priorSource ? ` (${row.priorSource.document}, p. ${row.priorSource.page})` : ""}` }), element("td", { text: `${row.currentValue}${row.currentSource ? ` (${row.currentSource.document}, p. ${row.currentSource.page})` : ""}` }), element("td", { text: row.percentChange === null ? "Not calculated" : `${row.percentChange > 0 ? "+" : ""}${row.percentChange}%` }), element("td", { text: `${row.interpretation}${row.warning ? ` ${row.warning}` : ""}` })])));
     table.append(body); ui.sectionContent.append(element("article", { class: "card" }, [element("h3", { text: "Financial-terms comparison" }), element("p", { text: "Premium and commission assumptions are separate from attachment-point and other retained-risk movement." })]), element("div", { class: "table-wrap" }, table));
   }
 

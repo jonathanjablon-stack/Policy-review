@@ -32,6 +32,8 @@ The three v16.1 HTML entry points are byte-identical at build time. The offline 
 - OCR progress, page confidence, extraction method, render DPI, timing, and failure provenance
 - OCR provenance in findings, facts, source views, saved sessions, Word reports, and the standalone Excel matrix
 - Explicit unresolved-page warnings when OCR still cannot recover usable text
+- Labeled Current and Renewal Option financial rows with separate candidate calculations and commission warnings
+- Exact REMOVE / AND REPLACE WITH amendment chains that supersede only matching earlier language
 
 ## Run
 
@@ -64,6 +66,8 @@ node --test tests/*.test.js
 node scripts/build.js
 node scripts/verify-build.js
 ```
+
+The proprietary calibration corpus is not committed. After materializing it separately, run `npm run calibrate:corpus -- --corpus-dir /absolute/path/to/materialized-corpus` to reproduce the mandatory Crowne and Palmetto release gate.
 
 ## Design posture
 

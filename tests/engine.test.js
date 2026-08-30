@@ -31,6 +31,15 @@ test("document parsing preserves page boundaries and provenance", () => {
   assert.ok(doc.clauses.every(clause => clause.sourceDocument === "sample.txt"));
 });
 
+test("PDF line reconstruction preserves reading rows by position", () => {
+  const text = DocumentModel.reconstructPdfLines([
+    { str: "$175,000", transform: [1, 0, 0, 1, 300, 700] },
+    { str: "Annual Specific Deductible", transform: [1, 0, 0, 1, 20, 700] },
+    { str: "Renewal Option 3", transform: [1, 0, 0, 1, 20, 720] }
+  ]);
+  assert.equal(text, "Renewal Option 3\nAnnual Specific Deductible $175,000");
+});
+
 test("repeated headers and footers are removed across pages", () => {
   const pages = [1, 2, 3].map(number => ({ number, text: `CONFIDENTIAL POLICY\nSECTION ${number}\nUnique clause ${number}.\nPage ${number}` }));
   const doc = DocumentModel.parseDocument({ id: "repeat", name: "repeat.pdf", pages });
@@ -99,6 +108,23 @@ test("Palmetto-style REMOVE and REPLACE sequence retains original and replacemen
   assert.match(event.replacementLanguage, /\$250/);
 });
 
+test("later exact amendment replacements supersede only the language they replace", () => {
+  const first = parse("Amendment 1.pdf", "AMENDMENT 1\nREMOVE: Deductibles accumulate separately. AND REPLACE WITH: Deductibles cross-apply.\nREMOVE: Emergency Room Services 100% after deductible. AND REPLACE WITH: Emergency Room Services 100% after guided provider deductible.", "amendment", 1);
+  const second = parse("Amendment 2.pdf", "AMENDMENT 2\nREMOVE: Urgent Care $70 copay, then 100%. AND REPLACE WITH: Urgent Care $70 copay, then 100% after guided provider deductible.", "amendment", 2);
+  const third = parse("Amendment 3.pdf", "AMENDMENT 3\nREMOVE: Urgent Care $70 copay, then 100% after guided provider deductible. AND REPLACE WITH: Urgent Care $70 copay applied to guided out of pocket, then 100%.\nREMOVE: Emergency Room Services 100% after guided provider deductible. AND REPLACE WITH: Emergency Room Services includes direct inpatient admission within 24 hours; 100% after guided provider deductible.", "amendment", 3);
+  const events = Engine.hierarchyEvents([first, second, third], RuleLibrary.rules);
+  assert.equal(events.length, 5);
+  const deductible = events.find(event => /Deductibles cross-apply/i.test(event.replacementLanguage));
+  const oldUrgent = events.find(event => /Urgent Care \$70 copay, then 100% after guided/i.test(event.replacementLanguage));
+  const oldEmergency = events.find(event => /^Emergency Room Services 100% after guided/i.test(event.replacementLanguage));
+  const newUrgent = events.find(event => /guided out of pocket/i.test(event.replacementLanguage));
+  assert.equal(deductible.status, "current");
+  assert.equal(oldUrgent.status, "superseded");
+  assert.equal(oldEmergency.status, "superseded");
+  assert.equal(newUrgent.status, "current");
+  assert.equal(newUrgent.supersedesEventId, oldUrgent.id);
+});
+
 test("completeness distinguishes located, multiple, not located, and unable to determine", () => {
   const readable = Engine.analyzeMatter([parse("readable.pdf", "Specific Deductible: $100,000. Specific Deductible: $125,000.", "policy", 0)], RuleLibrary, "standalone");
   assert.equal(readable.completeness.find(x => x.conceptId === "FIN-SPECIFIC-ATTACHMENT").status, "Multiple provisions located");
@@ -132,6 +158,18 @@ test("renewal financial comparison calculates retained-risk increases", () => {
   const result = Comparison.buildComparison(prior, renewal, "renewal");
   assert.equal(result.financialTerms.find(x => x.fieldId === "specific_attachment").percentChange, 71.4);
   assert.equal(result.financialTerms.find(x => x.fieldId === "aggregating_specific").percentChange, 33.3);
+});
+
+test("multi-option proposal tables preserve option labels and calculate each candidate separately", () => {
+  const prior = parse("prior.pdf", "SCHEDULE\nSpecific Attachment Point: $175,000. Aggregating Specific Deductible: $150,000.", "policy", 0);
+  const proposal = parse("renewal proposal.pdf", "Plan Description Current Renewal Option 1 Renewal Option 2\nAnnual Specific Deductible per Individual $ 175,000 $ 175,000 $ 225,000\nAggregating Specific Additional Plan Liability $ 150,000 $ 150,000 $ 700,000\nQuoted Rate(s) include Commission of 10.00% 0.00% 0.00%\fPlan Description Renewal Option 3\nAnnual Specific Deductible per Individual $ 300,000\nAggregating Specific Additional Plan Liability $ 200,000\nQuoted Rate(s) include Commission of 0.00%", "proposal", 1);
+  const renewal = Engine.analyzeMatter([proposal], RuleLibrary, "renewal");
+  const optionThreeFact = renewal.facts.find(fact => fact.fieldId === "specific_attachment" && fact.contextLabel === "Renewal Option 3");
+  assert.equal(optionThreeFact.value, "300,000");
+  const result = Comparison.buildComparison(Engine.analyzeMatter([prior], RuleLibrary, "renewal"), renewal, "renewal");
+  assert.equal(result.financialTerms.find(row => row.fieldId === "specific_attachment" && row.contextLabel === "Renewal Option 3").percentChange, 71.4);
+  assert.equal(result.financialTerms.find(row => row.fieldId === "aggregating_specific" && row.contextLabel === "Renewal Option 3").percentChange, 33.3);
+  assert.ok(result.financialTerms.some(row => row.fieldId === "commission" && /must not be blended/i.test(row.warning)));
 });
 
 test("comparison similarity is deterministic", () => {
