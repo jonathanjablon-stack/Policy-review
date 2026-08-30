@@ -39,7 +39,9 @@ const sha256 = value => crypto.createHash("sha256").update(value).digest("hex");
 const manifest = {
   version: "16.0.0",
   ruleLibraryVersion: rules.version,
-  builtAt: new Date().toISOString(),
+  builtAt: process.env.SOURCE_DATE_EPOCH
+    ? new Date(Number(process.env.SOURCE_DATE_EPOCH) * 1000).toISOString()
+    : "2026-08-30T00:00:00.000Z",
   artifact: "StopLoss_Workbench_v16.0.0.html",
   sha256: sha256(html),
   bytes: Buffer.byteLength(html),
