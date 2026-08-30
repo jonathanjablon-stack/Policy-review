@@ -1,0 +1,14 @@
+{
+  "version": "16.0.0",
+  "ruleLibraryVersion": "1.0.0",
+  "builtAt": "2026-08-30T19:00:42.722Z",
+  "artifact": "StopLoss_Workbench_v16.0.0.html",
+  "sha256": "cc34dd5561d5ef176371241712a693009e037cd275fe4a408aab4825d8c2d32d",
+  "bytes": 110477,
+  "localProcessing": true,
+  "externalRuntimeDependencies": [
+    "PDF.js 3.11.174",
+    "Mammoth.js 1.8.0"
+  ],
+  "manualTextFallback": true
+}

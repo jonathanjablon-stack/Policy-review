@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0.0",
+  "development": [
+    {
+      "id": "CROWNE-FINANCIAL-SYNTHETIC",
+      "role": "policy",
+      "text": "SCHEDULE OF INSURANCE\nPolicy Term: August 1, 2025 through July 31, 2026. The Schedule of Insurance controls if it conflicts with the Policy. Specific Attachment Point: $175,000. Aggregating Specific Deductible: $150,000. Specific Payable Percentage: 100%. High-dollar reporting threshold: $75,000. Proof of loss must be furnished within 90 days.",
+      "expectedRules": ["FIN-POLICY-TERM", "FIN-SPECIFIC-ATTACHMENT", "FIN-AGG-SPECIFIC", "FIN-SPECIFIC-PERCENT", "ADMIN-REPORTING", "ADMIN-PROOF", "ENF-SCHEDULE-CONTROLS"]
+    },
+    {
+      "id": "PLAN-MIRROR-SYNTHETIC",
+      "role": "endorsement",
+      "text": "PLAN MIRRORING ENDORSEMENT\nThis endorsement modifies the Policy. The illegal acts exclusion is deleted. Plan mirroring remains conditioned on timely delivery of the plan document and notice of each material change.",
+      "expectedRules": ["FIN-PLAN-MIRROR", "FAV-MIRROR-DELETES", "EXC-ILLEGAL-ACTS", "VEND-DOCUMENT-DELIVERY", "VEND-MATERIAL-CHANGE"]
+    },
+    {
+      "id": "ADVANCE-FUNDING-SYNTHETIC",
+      "role": "endorsement",
+      "text": "EXPEDITED ADVANCE FUNDING ENDORSEMENT\nAdvance funding is available if satisfactory proof of loss is provided. The Policyholder must repay any overpayment, and the Company may offset amounts due.",
+      "expectedRules": ["ADMIN-ADVANCE", "ADMIN-ADVANCE-CONDITION", "ADMIN-PROOF", "ADMIN-OVERPAYMENT", "ADMIN-OFFSET", "FAV-ADVANCE"]
+    },
+    {
+      "id": "FEDERAL-PAYMENT-SYNTHETIC",
+      "role": "plan",
+      "text": "Emergency services furnished by an out-of-network provider are paid under the No Surprises Act using the recognized amount and qualifying payment amount. Federal IDR and the open negotiation period apply.",
+      "expectedRules": ["FED-NSA", "FED-QPA", "FED-IDR", "FED-RECOGNIZED-AMOUNT", "FED-OON"]
+    },
+    {
+      "id": "RECOVERY-SYNTHETIC",
+      "role": "policy",
+      "text": "Amounts recoverable through subrogation or from a responsible third party will be offset, whether or not amounts were actually recovered. Coordination of Benefits and Medicare secondary rules also apply.",
+      "expectedRules": ["REC-SUBROGATION", "REC-RECOVERABLE", "REC-OFFSET", "REC-COB", "REC-MEDICARE-COB"]
+    }
+  ],
+  "heldOut": [
+    {
+      "id": "HELDOUT-UNDERWRITING",
+      "role": "proposal",
+      "text": "This quote is conditioned on complete disclosure of every known or potential claim, census threshold compliance, and notice of mergers or acquisitions. A material omission or misrepresentation may permit rescission.",
+      "expectedRules": ["UW-DISCLOSURE", "UW-KNOWN-CLAIM", "UW-CENSUS", "ELIG-ACQUISITION", "UW-OMISSION", "UW-MISREP", "UW-RESCISSION"]
+    },
+    {
+      "id": "HELDOUT-ENFORCEMENT",
+      "role": "policy",
+      "text": "Any dispute is subject first to mediation and then arbitration. Exclusive venue lies in the stated jurisdiction and this Policy is governed by the laws of that state. Legal action must be brought within two years.",
+      "expectedRules": ["ENF-MEDIATION", "ENF-ARBITRATION", "ENF-VENUE", "ENF-GOV-LAW", "ENF-LEGAL-LIMIT"]
+    },
+    {
+      "id": "HELDOUT-MEDICAL",
+      "role": "policy",
+      "text": "Gene therapy, CAR-T cell therapy, specialty pharmaceuticals, transplants, clinical trials, and off-label drug use require prior authorization and must satisfy the Company's medical necessity and experimental or investigational standards.",
+      "expectedRules": ["MED-GENE-CELL", "MED-SPECIALTY-DRUG", "MED-TRANSPLANT", "MED-CLINICAL-TRIAL", "MED-OFF-LABEL", "MED-PREAUTH", "MED-MEDICAL-NECESSITY", "MED-EXPERIMENTAL"]
+    }
+  ],
+  "negativeControls": [
+    {
+      "id": "NEG-NO-MEDICARE",
+      "text": "The carrier uses a proprietary reimbursement schedule for participating facilities.",
+      "forbiddenRules": ["PRICE-MEDICARE", "REC-MEDICARE-COB"]
+    },
+    {
+      "id": "NEG-NO-ARBITRATION",
+      "text": "The parties may discuss questions informally with the account manager.",
+      "forbiddenRules": ["ENF-ARBITRATION", "ENF-MEDIATION"]
+    },
+    {
+      "id": "NEG-NO-CONFIRMED-GAP",
+      "text": "The Policy contains an experimental treatment exclusion.",
+      "forbiddenClassifications": ["Confirmed Plan/Policy Difference"]
+    }
+  ]
+}

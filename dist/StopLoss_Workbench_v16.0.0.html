@@ -1,0 +1,1480 @@
+<!doctype html>
+<!-- Stop-Loss Policy Review Workbench v16.0.0 | Rule library 1.0.0 | deterministic local processing -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Stop-Loss Policy Review Workbench</title>
+  <style>
+:root {
+  --ink: #162338;
+  --muted: #627086;
+  --paper: #ffffff;
+  --canvas: #f3f6fa;
+  --line: #d8e0ea;
+  --navy: #0b2d4f;
+  --blue: #1769aa;
+  --blue-soft: #eaf4fc;
+  --teal: #087f8c;
+  --red: #b42318;
+  --amber: #9a6700;
+  --green: #18794e;
+  --shadow: 0 12px 35px rgba(18, 45, 73, .09);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--canvas); color: var(--ink); }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+.topbar { min-height: 94px; padding: 20px clamp(22px, 4vw, 64px); background: var(--navy); color: white; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.topbar h1 { margin: 2px 0 0; font-size: clamp(1.35rem, 3vw, 2rem); letter-spacing: -.025em; }
+.eyebrow, .kicker, .step { margin: 0; text-transform: uppercase; letter-spacing: .11em; font-size: .72rem; font-weight: 800; color: #65b9ea; }
+.version-badge { border: 1px solid rgba(255,255,255,.28); border-radius: 999px; padding: 8px 13px; font-weight: 800; white-space: nowrap; }
+.version-badge span { color: #9bd7f5; font-size: .78rem; margin-left: 8px; }
+main { min-height: calc(100vh - 94px); }
+.start-view { width: min(1220px, calc(100% - 32px)); margin: 30px auto 60px; display: grid; gap: 20px; }
+.panel, .upload-card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.hero { padding: 28px; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, .7fr); gap: 28px; align-items: center; }
+.hero h2 { margin: 6px 0 10px; font-size: clamp(1.55rem, 3vw, 2.35rem); letter-spacing: -.03em; }
+.hero p:not(.kicker) { color: var(--muted); line-height: 1.6; max-width: 760px; }
+.privacy-note { padding: 18px; border-radius: 12px; background: #eaf7f4; border: 1px solid #bde1d8; color: #155b4c; line-height: 1.5; }
+.workflow-grid { margin: 0; padding: 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.workflow-grid legend { padding: 0 8px; color: var(--muted); font-weight: 800; }
+.workflow-card { display: flex; min-height: 120px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; background: white; transition: .18s ease; }
+.workflow-card:hover { border-color: #78b9df; transform: translateY(-1px); }
+.workflow-card.selected { border-color: var(--blue); box-shadow: inset 0 0 0 2px var(--blue); background: var(--blue-soft); }
+.workflow-card input { margin: 3px 11px 0 0; accent-color: var(--blue); }
+.workflow-card strong, .workflow-card small { display: block; }
+.workflow-card small { color: var(--muted); line-height: 1.45; margin-top: 8px; }
+.upload-grid { padding: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.upload-grid:has(.upload-card[hidden]) { grid-template-columns: 1fr; }
+.upload-card { padding: 22px; box-shadow: none; display: grid; gap: 16px; }
+.upload-card h3 { margin: 3px 0 6px; }
+.upload-card p:not(.step) { color: var(--muted); margin: 0; }
+.drop-zone { min-height: 112px; border: 2px dashed #9fb5ca; border-radius: 12px; display: grid; place-items: center; text-align: center; padding: 18px; color: var(--blue); font-weight: 800; background: #f8fbfe; cursor: pointer; }
+.drop-zone input, .secondary-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.file-list { margin: 0; padding-left: 22px; color: var(--muted); }
+.file-list:empty { display: none; }
+textarea { width: 100%; border: 1px solid var(--line); border-radius: 9px; padding: 11px; resize: vertical; margin-top: 10px; }
+.start-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.primary-button, .secondary-button, .quiet-button { border-radius: 9px; padding: 10px 15px; border: 1px solid transparent; font-weight: 800; }
+.primary-button { background: var(--blue); color: white; padding: 12px 20px; }
+.secondary-button { display: inline-flex; align-items: center; background: white; border-color: #9fb5ca; color: var(--navy); }
+.quiet-button { background: transparent; border-color: var(--line); color: inherit; }
+.alert { border-radius: 10px; padding: 13px 15px; line-height: 1.5; }
+.alert.error { background: #fff1f0; border: 1px solid #ffc9c5; color: var(--red); }
+.alert.warning { background: #fff8e6; border: 1px solid #f1d18a; color: #714c00; margin-bottom: 16px; }
+.workspace { min-height: calc(100vh - 94px); display: grid; grid-template-columns: 270px minmax(0, 1fr); }
+.sidebar { background: #102b46; color: white; padding: 24px 18px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: calc(100vh - 0px); }
+.matter-head { padding: 0 8px; }
+.matter-head h2 { margin: 5px 0; font-size: 1.15rem; }
+.matter-head p:last-child { color: #afc5d8; font-size: .84rem; }
+#sectionNav { display: grid; gap: 5px; }
+#sectionNav button { border: 0; background: transparent; color: #c9d9e7; text-align: left; padding: 10px 12px; border-radius: 8px; font-weight: 700; }
+#sectionNav button:hover, #sectionNav button.active { background: #1c466b; color: white; }
+.sidebar-actions { margin-top: auto; display: grid; gap: 8px; }
+.sidebar .quiet-button { border-color: #416482; color: white; }
+.workspace-main { min-width: 0; padding: 26px clamp(18px, 3vw, 44px) 60px; }
+.workspace-toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 22px; }
+.workspace-toolbar h2 { margin: 5px 0 0; font-size: 1.75rem; }
+.export-menu { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.section-content { display: grid; gap: 16px; }
+.card { background: white; border: 1px solid var(--line); border-radius: 13px; padding: 19px; box-shadow: 0 5px 18px rgba(18,45,73,.05); }
+.card h3, .card h4 { margin-top: 0; }
+.metric-grid { display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; }
+.metric { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 15px; }
+.metric strong { display: block; font-size: 1.7rem; color: var(--navy); }
+.metric span { color: var(--muted); font-size: .82rem; }
+.priority-list { display: grid; gap: 9px; }
+.priority-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.priority-row:first-child { border-top: 0; }
+.badge { display: inline-flex; border-radius: 999px; padding: 4px 8px; font-size: .72rem; font-weight: 850; white-space: nowrap; background: #edf1f5; color: var(--navy); }
+.badge.Critical, .badge.High { background: #fdecea; color: var(--red); }
+.badge.Moderate { background: #fff4d8; color: var(--amber); }
+.badge.Low { background: #e9f5ee; color: var(--green); }
+.badge.Informational { background: #eaf4fc; color: var(--blue); }
+.toolbar-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.toolbar-row input[type=search], .toolbar-row select, .field-control { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; background: white; }
+.toolbar-row input[type=search] { min-width: min(320px, 100%); flex: 1; }
+.findings-list { display: grid; gap: 12px; }
+.finding-card { background: white; border: 1px solid var(--line); border-left: 5px solid #8ca4b8; border-radius: 12px; overflow: hidden; }
+.finding-card[data-severity=Critical], .finding-card[data-severity=High] { border-left-color: var(--red); }
+.finding-summary { padding: 16px 18px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+.finding-summary h3 { margin: 2px 0 7px; font-size: 1rem; }
+.finding-summary p { color: var(--muted); margin: 0; font-size: .86rem; }
+.finding-detail { border-top: 1px solid var(--line); padding: 18px; background: #fbfcfe; display: grid; gap: 14px; }
+.finding-detail[hidden] { display: none; }
+.finding-detail blockquote { margin: 0; border-left: 3px solid #8fb6d2; padding: 11px 14px; background: white; white-space: pre-wrap; line-height: 1.55; }
+.review-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.review-grid label { display: grid; gap: 5px; color: var(--muted); font-size: .78rem; font-weight: 800; }
+.review-notes { min-height: 80px; }
+.source-list { display: grid; gap: 7px; }
+.source-button { border: 1px solid var(--line); background: white; color: var(--blue); border-radius: 7px; padding: 8px 10px; text-align: left; }
+.table-wrap { overflow-x: auto; background: white; border: 1px solid var(--line); border-radius: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+th { background: #edf3f8; color: var(--navy); text-align: left; position: sticky; top: 0; }
+th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td pre { margin: 0; white-space: pre-wrap; font: inherit; max-width: 620px; }
+.status-Located { color: var(--green); font-weight: 800; }
+.status-Not-located, .status-Unable-to-determine { color: var(--amber); font-weight: 800; }
+.fact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fact-card { border: 1px solid var(--line); border-radius: 10px; padding: 13px; background: white; }
+.fact-card label { color: var(--muted); font-size: .76rem; font-weight: 800; }
+.fact-value { margin: 5px 0 8px; font-weight: 800; }
+.fact-source { color: var(--muted); font-size: .78rem; }
+.document-health { display: grid; gap: 10px; }
+.health-row { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 15px; align-items: center; border-top: 1px solid var(--line); padding-top: 10px; }
+dialog { width: min(900px, calc(100% - 32px)); max-height: 88vh; border: 0; border-radius: 14px; padding: 22px; color: var(--ink); box-shadow: 0 25px 80px rgba(0,0,0,.28); }
+dialog::backdrop { background: rgba(5, 21, 36, .65); }
+.dialog-head { display: flex; justify-content: space-between; align-items: start; gap: 20px; }
+.dialog-head h2 { margin: 4px 0 12px; }
+.source-meta { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: .84rem; }
+.source-meta dt { color: var(--muted); font-weight: 800; }
+.source-meta dd { margin: 0; }
+.source-text { padding: 18px; border-radius: 10px; background: #f2f5f8; white-space: pre-wrap; line-height: 1.55; max-height: 52vh; overflow: auto; }
+.busy-layer { position: fixed; inset: 0; z-index: 50; background: rgba(7,26,43,.58); display: grid; place-items: center; }
+.busy-layer[hidden] { display: none; }
+.busy-card { background: white; border-radius: 13px; padding: 24px 30px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); }
+.spinner { width: 22px; height: 22px; border: 3px solid #cbd9e5; border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+[hidden] { display: none !important; }
+@media (max-width: 980px) {
+  .workflow-grid { grid-template-columns: repeat(2, 1fr); }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .workspace { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  #sectionNav { grid-template-columns: repeat(3, 1fr); }
+  .sidebar-actions { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 680px) {
+  .topbar, .workspace-toolbar { align-items: flex-start; flex-direction: column; }
+  .hero, .upload-grid, .workflow-grid, .fact-grid, .review-grid { grid-template-columns: 1fr; }
+  #sectionNav { grid-template-columns: repeat(2, 1fr); }
+  .finding-summary { grid-template-columns: auto 1fr; }
+  .finding-summary > button { grid-column: 2; }
+  .export-menu { justify-content: flex-start; }
+}
+
+</style>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Local-first contract analysis</p>
+      <h1>Stop-Loss Policy Review Workbench</h1>
+    </div>
+    <div class="version-badge">v16.0.0 <span>Rules 1.0.0</span></div>
+  </header>
+
+  <main>
+    <section id="startView" class="start-view">
+      <div class="hero panel">
+        <div>
+          <p class="kicker">Deterministic, clause-first review</p>
+          <h2>Choose the legal review workflow</h2>
+          <p>The workbench preserves clause provenance, applies document hierarchy, pairs concepts across documents, and leaves every exported conclusion under reviewer control.</p>
+        </div>
+        <div class="privacy-note"><strong>Privacy:</strong> Policy files stay in this browser. The workbench includes no telemetry and makes no generative-AI calls.</div>
+      </div>
+
+      <fieldset class="workflow-grid panel" id="workflowGrid">
+        <legend>Review mode</legend>
+        <label class="workflow-card selected"><input type="radio" name="mode" value="standalone" checked><span><strong>Standalone policy</strong><small>Policy at a Glance, hierarchy, findings, favorable terms, completeness</small></span></label>
+        <label class="workflow-card"><input type="radio" name="mode" value="plan-policy"><span><strong>Plan vs. stop-loss</strong><small>Concept-paired plan and reimbursement comparison</small></span></label>
+        <label class="workflow-card"><input type="radio" name="mode" value="renewal"><span><strong>Prior vs. renewal</strong><small>Risk-transfer, financial-term, deadline, and clause changes</small></span></label>
+        <label class="workflow-card"><input type="radio" name="mode" value="proposal-policy"><span><strong>Proposal vs. issued policy</strong><small>Promised features, qualifications, and final contract terms</small></span></label>
+      </fieldset>
+
+      <section class="upload-grid panel">
+        <article class="upload-card">
+          <div>
+            <p class="step">Document set A</p>
+            <h3 id="leftTitle">Policy and modifying documents</h3>
+            <p id="leftHelp">Add the base policy, schedule, endorsements, riders, and amendments in controlling sequence.</p>
+          </div>
+          <label class="drop-zone">Choose PDF, DOCX, or TXT files<input id="leftFiles" type="file" multiple accept=".pdf,.docx,.txt,.text"></label>
+          <ol id="leftFileList" class="file-list"></ol>
+          <details><summary>Manual text fallback</summary><textarea id="leftManual" rows="6" placeholder="Paste extractable policy text here. Use [[PAGE BREAK]] between pages when useful."></textarea></details>
+        </article>
+        <article class="upload-card" id="rightCard" hidden>
+          <div>
+            <p class="step">Document set B</p>
+            <h3 id="rightTitle">Comparison documents</h3>
+            <p id="rightHelp">Add the corresponding document and modifiers.</p>
+          </div>
+          <label class="drop-zone">Choose PDF, DOCX, or TXT files<input id="rightFiles" type="file" multiple accept=".pdf,.docx,.txt,.text"></label>
+          <ol id="rightFileList" class="file-list"></ol>
+          <details><summary>Manual text fallback</summary><textarea id="rightManual" rows="6" placeholder="Paste comparison text here."></textarea></details>
+        </article>
+      </section>
+
+      <div id="startError" class="alert error" role="alert" hidden></div>
+      <div class="start-actions">
+        <label class="secondary-button">Open saved session<input id="sessionInput" type="file" accept=".json,application/json"></label>
+        <button id="analyzeButton" class="primary-button">Build review workspace</button>
+      </div>
+    </section>
+
+    <section id="workspaceView" class="workspace" hidden>
+      <aside class="sidebar">
+        <div class="matter-head">
+          <p class="eyebrow">Current matter</p>
+          <h2 id="matterTitle">Review workspace</h2>
+          <p id="matterMeta"></p>
+        </div>
+        <nav id="sectionNav" aria-label="Review sections"></nav>
+        <div class="sidebar-actions">
+          <button id="newReviewButton" class="quiet-button">New review</button>
+          <button id="saveSessionButton" class="quiet-button">Save session JSON</button>
+        </div>
+      </aside>
+
+      <div class="workspace-main">
+        <div class="workspace-toolbar">
+          <div>
+            <p class="kicker">Attorney-controlled output</p>
+            <h2 id="sectionTitle">Overview</h2>
+          </div>
+          <div class="export-menu">
+            <button id="executiveExportButton" class="secondary-button">Executive Word</button>
+            <button id="detailedExportButton" class="secondary-button">Detailed Word</button>
+            <button id="excelExportButton" class="secondary-button">Excel matrix</button>
+          </div>
+        </div>
+        <div id="globalWarning" class="alert warning" hidden></div>
+        <section id="sectionContent" class="section-content" aria-live="polite"></section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="sourceDialog">
+    <div class="dialog-head"><div><p class="eyebrow">Source viewer</p><h2 id="sourceDialogTitle">Provision source</h2></div><button id="closeSourceButton" class="quiet-button" aria-label="Close source viewer">Close</button></div>
+    <dl id="sourceMeta" class="source-meta"></dl>
+    <pre id="sourceText" class="source-text"></pre>
+  </dialog>
+
+  <div id="busyLayer" class="busy-layer" hidden><div class="busy-card"><span class="spinner"></span><strong id="busyMessage">Reading documents...</strong></div></div>
+
+  <script>
+(function (root, factory) {
+  const library = factory();
+  if (typeof module === "object" && module.exports) module.exports = library;
+  root.StopLossRuleLibrary = library;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const VERSION = "1.0.0";
+
+  const rows = [
+    ["FIN-POLICY-TERM", "Policy term and coverage period", "Policy and Financial Structure", "Informational", "Informational", "policy (?:term|period)|effective date|expiration date|inception date"],
+    ["FIN-SPECIFIC-ATTACHMENT", "Specific attachment point", "Policy and Financial Structure", "Increased Retained Risk", "High", "specific (?:deductible|attachment point)|annual specific deductible"],
+    ["FIN-AGG-SPECIFIC", "Aggregating specific deductible", "Policy and Financial Structure", "Increased Retained Risk", "High", "aggregating specific|aggregate specific deductible|additional plan liability"],
+    ["FIN-AGGREGATE", "Aggregate attachment point", "Policy and Financial Structure", "Financial Limitation", "High", "aggregate attachment point|aggregate deductible|minimum aggregate attachment"],
+    ["FIN-BENEFIT-BASIS", "Contract or benefit basis", "Policy and Financial Structure", "Timing Risk", "High", "benefit basis|contract basis|(?:12|15|18|24|36|48|60|72)[/-](?:12|15|18|24|36)"],
+    ["FIN-INCURRED", "Definition of incurred", "Policy and Financial Structure", "Timing Risk", "High", "incurred (?:means|when|date)|date (?:on|upon) which.*incurred"],
+    ["FIN-PAID", "Definition of paid", "Policy and Financial Structure", "Timing Risk", "High", "paid (?:means|when|date)|deemed paid|payment instructions|check (?:is )?(?:issued|mailed|cleared)"],
+    ["FIN-RUN-IN", "Run-in coverage", "Policy and Financial Structure", "Timing Risk", "Moderate", "run[- ]?in|incurred prior to.*effective|prior incurred"],
+    ["FIN-RUN-OUT", "Run-out coverage", "Policy and Financial Structure", "Timing Risk", "High", "run[- ]?out|paid after.*termination|extended claim payment"],
+    ["FIN-TERMINAL-LIABILITY", "Terminal liability", "Policy and Financial Structure", "Timing Risk", "High", "terminal liability|terminal extension|extended benefits after termination"],
+    ["FIN-SPECIFIC-PERCENT", "Specific payable percentage", "Policy and Financial Structure", "Financial Limitation", "High", "specific (?:payable|reimbursement) percentage|specific coinsurance"],
+    ["FIN-AGG-PERCENT", "Aggregate payable percentage", "Policy and Financial Structure", "Financial Limitation", "High", "aggregate (?:payable|reimbursement) percentage|aggregate coinsurance"],
+    ["FIN-MAXIMUM", "Policy reimbursement maximum", "Policy and Financial Structure", "Financial Limitation", "Critical", "maximum (?:specific |aggregate )?(?:benefit|reimbursement|liability)|lifetime maximum|policy period maximum"],
+    ["FIN-PREMIUM", "Premium rates and calculation", "Policy and Financial Structure", "Informational", "Informational", "premium rate|monthly premium|premium per covered|deposit premium"],
+    ["FIN-GRACE", "Premium grace period", "Policy and Financial Structure", "Timing Risk", "High", "grace period|premium.*(?:due|delinquent|unpaid)"],
+    ["FIN-COMMISSION", "Commission assumption", "Policy and Financial Structure", "Pricing/Reimbursement Limitation", "Moderate", "commission|broker compensation|producer compensation"],
+    ["FIN-LASER", "Special risk limitation or laser", "Policy and Financial Structure", "Increased Retained Risk", "Critical", "laser|special risk limitation|alternate specific deductible|contingent specific"],
+    ["FIN-RATE-CAP", "Renewal rate cap", "Policy and Financial Structure", "Favorable Provision", "Moderate", "renewal rate cap|rate cap|maximum renewal increase"],
+    ["FIN-NO-NEW-LASER", "No-new-laser protection", "Policy and Financial Structure", "Favorable Provision", "Moderate", "no new (?:laser|special risk)|without new individual limitation"],
+    ["FIN-PLAN-MIRROR", "Plan mirroring", "Policy and Financial Structure", "Favorable Provision", "Moderate", "plan mirroring|mirrors? the plan|eligible under the plan.*eligible expense"],
+
+    ["ELIG-ACTIVE-WORK", "Actively-at-work requirement", "Eligibility and Continuation", "Eligibility Risk", "High", "actively at work|active work requirement|working the required number"],
+    ["ELIG-CLASS", "Eligible employee classes", "Eligibility and Continuation", "Eligibility Risk", "Moderate", "eligible class|class of employee|eligibility class"],
+    ["ELIG-DEPENDENT", "Dependent eligibility", "Eligibility and Continuation", "Eligibility Risk", "Moderate", "eligible dependent|dependent child|dependent spouse"],
+    ["ELIG-DISABLED-DEPENDENT", "Disabled dependent continuation", "Eligibility and Continuation", "Eligibility Risk", "High", "disabled dependent|incapacitated dependent|dependent disability"],
+    ["ELIG-LEAVE", "Leave of absence", "Eligibility and Continuation", "Eligibility Risk", "High", "leave of absence|family and medical leave|FMLA|military leave"],
+    ["ELIG-COBRA", "COBRA continuation", "Eligibility and Continuation", "Eligibility Risk", "High", "COBRA|continuation coverage|qualified beneficiary"],
+    ["ELIG-RETIREE", "Retiree coverage", "Eligibility and Continuation", "Eligibility Risk", "High", "retiree|retired employee"],
+    ["ELIG-REHIRE", "Rehire treatment", "Eligibility and Continuation", "Eligibility Risk", "Moderate", "rehire|re-employ|reemploy"],
+    ["ELIG-ACQUISITION", "Acquisitions and new groups", "Eligibility and Continuation", "Underwriting/Disclosure Risk", "High", "acquisition|merger|new unit|new subsidiary|new group"],
+    ["ELIG-ELIGIBILITY-CHANGE", "Eligibility rule changes", "Eligibility and Continuation", "Underwriting/Disclosure Risk", "High", "change.*eligibility|eligibility.*change|material change.*eligible"],
+
+    ["VEND-PLAN-AMENDMENT", "Plan amendment approval", "Plan Changes and Vendors", "Contract Interpretation Risk", "High", "plan (?:document )?(?:amendment|change).*?(?:approval|consent)|(?:approval|consent).*?plan (?:document )?(?:amendment|change)"],
+    ["VEND-MATERIAL-CHANGE", "Material change condition", "Plan Changes and Vendors", "Underwriting/Disclosure Risk", "High", "material change|materially change|material modification"],
+    ["VEND-TPA", "Third-party administrator", "Plan Changes and Vendors", "Administrative Requirement", "Moderate", "third[- ]party administrator|\bTPA\b|claim administrator"],
+    ["VEND-PBM", "Pharmacy benefit manager", "Plan Changes and Vendors", "Administrative Requirement", "Moderate", "pharmacy benefit manager|\bPBM\b"],
+    ["VEND-NETWORK", "Provider network", "Plan Changes and Vendors", "Pricing/Reimbursement Limitation", "Moderate", "provider network|\bPPO\b|network agreement|network vendor"],
+    ["VEND-COST-CONTAINMENT", "Cost containment vendor", "Plan Changes and Vendors", "Administrative Requirement", "Moderate", "cost containment|bill review vendor|claim negotiation vendor"],
+    ["VEND-RBP", "Reference-based pricing vendor", "Plan Changes and Vendors", "Pricing/Reimbursement Limitation", "High", "reference[- ]based pricing|\bRBP\b|reference pricing vendor"],
+    ["VEND-DOCUMENT-DELIVERY", "Document delivery requirement", "Plan Changes and Vendors", "Administrative Requirement", "High", "deliver.*plan document|provide.*plan document|document delivery|within .* days.*document"],
+    ["VEND-APPROVED-DOCUMENT", "Carrier-recognized plan document", "Plan Changes and Vendors", "Contract Interpretation Risk", "High", "approved plan document|plan document on file|accepted by (?:us|the company|carrier)"],
+    ["VEND-DISCRETION", "Plan administrator discretion", "Plan Changes and Vendors", "Carrier Discretion", "High", "discretionary authority|sole discretion|abuse of discretion"],
+
+    ["MED-MEDICAL-NECESSITY", "Medical necessity standard", "Medical and Clinical", "Carrier Discretion", "High", "medically necessary|medical necessity|necessary and appropriate"],
+    ["MED-EXPERIMENTAL", "Experimental or investigational services", "Medical and Clinical", "Potential Coverage Gap", "High", "experimental|investigational|unproven|investigative treatment"],
+    ["MED-OFF-LABEL", "Off-label use", "Medical and Clinical", "Potential Coverage Gap", "High", "off[- ]label|unlabeled use|FDA[- ]approved indication"],
+    ["MED-GENE-CELL", "Gene and cell therapy", "Medical and Clinical", "Potential Coverage Gap", "Critical", "gene therapy|cell therapy|CAR[- ]?T|chimeric antigen|genetic therapy"],
+    ["MED-SPECIALTY-DRUG", "Specialty pharmaceuticals", "Medical and Clinical", "Potential Coverage Gap", "High", "specialty (?:drug|pharmaceutical)|high[- ]cost drug|specialty medication"],
+    ["MED-TRANSPLANT", "Transplant provisions", "Medical and Clinical", "Potential Coverage Gap", "High", "transplant|organ procurement|donor expense"],
+    ["MED-CLINICAL-TRIAL", "Clinical trials", "Medical and Clinical", "Compliance Interaction", "High", "clinical trial|routine patient costs.*trial"],
+    ["MED-PREAUTH", "Preauthorization requirement", "Medical and Clinical", "Administrative Requirement", "High", "preauthorization|pre-certification|precertification|prior authorization"],
+    ["MED-PROVIDER-ERROR", "Provider error", "Medical and Clinical", "Potential Coverage Gap", "High", "provider error|medical error|never event|wrong-site"],
+    ["MED-HAC", "Facility-acquired condition", "Medical and Clinical", "Potential Coverage Gap", "High", "hospital[- ]acquired|facility[- ]acquired|healthcare[- ]acquired condition"],
+    ["MED-COSMETIC", "Cosmetic treatment exclusion", "Medical and Clinical", "Potential Coverage Gap", "Moderate", "cosmetic (?:surgery|procedure|treatment)|not medically necessary.*appearance"],
+    ["MED-INFERTILITY", "Infertility and reproductive services", "Medical and Clinical", "Potential Coverage Gap", "Moderate", "infertility|in vitro|IVF|assisted reproductive"],
+    ["MED-MENTAL-PARITY", "Mental health and substance use interaction", "Medical and Clinical", "Compliance Interaction", "High", "mental health|substance use disorder|MHPAEA|behavioral health"],
+    ["MED-TELEHEALTH", "Telehealth", "Medical and Clinical", "Potential Coverage Gap", "Low", "telehealth|telemedicine|virtual visit"],
+
+    ["PRICE-UC", "Usual and customary limitation", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "High", "usual and customary|reasonable and customary|usual and reasonable"],
+    ["PRICE-MAC", "Maximum allowable charge", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "High", "maximum allowable charge|maximum allowable amount|allowable charge"],
+    ["PRICE-MEDICARE", "Medicare-based reimbursement limitation", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "Critical", "(?:percent|percentage|multiple|%|based on).*?Medicare|Medicare.*?(?:percent|percentage|multiple|%|fee schedule|benchmark)"],
+    ["PRICE-RBP", "Reference-based pricing", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "High", "reference[- ]based pricing|reference price|Medicare reference"],
+    ["PRICE-NETWORK", "Network or PPO rate limitation", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "High", "network rate|PPO rate|contracted rate|network discount"],
+    ["PRICE-SETTLEMENT", "Provider settlement", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "High", "provider settlement|settlement agreement|negotiated settlement"],
+    ["PRICE-NEGOTIATION", "Negotiated claim payment", "Pricing and Reimbursement", "Administrative Requirement", "Moderate", "claim negotiation|negotiated amount|negotiation service"],
+    ["PRICE-SAVINGS-FEE", "Percentage-of-savings fee", "Pricing and Reimbursement", "Financial Limitation", "High", "percentage of savings|percent of savings|savings fee|contingency fee"],
+    ["PRICE-LOST-DISCOUNT", "Lost discount from untimely payment", "Pricing and Reimbursement", "Timing Risk", "High", "lost discount|loss of discount|untimely payment|late payment.*discount"],
+    ["PRICE-BALANCE-BILL", "Balance-bill treatment", "Pricing and Reimbursement", "Financial Limitation", "High", "balance bill|balance billing|provider demand.*additional"],
+    ["PRICE-AUDIT-REDUCTION", "Post-payment audit reduction", "Pricing and Reimbursement", "Pricing/Reimbursement Limitation", "Moderate", "post[- ]payment audit|retrospective audit|audit reduction"],
+
+    ["FED-NSA", "No Surprises Act interaction", "Federal Payment Interactions", "Compliance Interaction", "High", "No Surprises Act|surprise billing|emergency services.*out[- ]of[- ]network"],
+    ["FED-QPA", "Qualifying payment amount", "Federal Payment Interactions", "Compliance Interaction", "High", "qualifying payment amount|\bQPA\b"],
+    ["FED-IDR", "Independent dispute resolution", "Federal Payment Interactions", "Compliance Interaction", "High", "independent dispute resolution|federal IDR|open negotiation period"],
+    ["FED-RECOGNIZED-AMOUNT", "Recognized amount", "Federal Payment Interactions", "Compliance Interaction", "Moderate", "recognized amount|out[- ]of[- ]network rate"],
+    ["FED-OON", "Out-of-network payment", "Federal Payment Interactions", "Pricing/Reimbursement Limitation", "High", "out[- ]of[- ]network (?:payment|rate|provider)|nonparticipating provider"],
+    ["FED-APPEAL-LATE", "Appeal-driven late payment", "Federal Payment Interactions", "Timing Risk", "High", "appeal.*(?:late|delay|payment)|external review.*payment"],
+
+    ["REC-MEDICARE-COB", "Medicare coordination", "Other Coverage and Recovery", "Compliance Interaction", "High", "Medicare.*?(?:primary|secondary|coordinate|eligible|entitled)|(?:primary|secondary).*?Medicare"],
+    ["REC-COB", "Coordination of benefits", "Other Coverage and Recovery", "Financial Limitation", "High", "coordination of benefits|other plan.*primary|order of benefit determination"],
+    ["REC-WORKERS-COMP", "Workers compensation", "Other Coverage and Recovery", "Potential Coverage Gap", "High", "workers'? compensation|work[- ]related injury|occupational injury"],
+    ["REC-OTHER-INSURANCE", "Other insurance", "Other Coverage and Recovery", "Financial Limitation", "Moderate", "other insurance|other coverage|duplicate coverage"],
+    ["REC-SUBROGATION", "Subrogation rights", "Other Coverage and Recovery", "Financial Limitation", "High", "subrogation|subrogate|third[- ]party recovery"],
+    ["REC-REIMBURSEMENT", "Reimbursement and recovery", "Other Coverage and Recovery", "Financial Limitation", "High", "right of reimbursement|recovery from third party|reimburse.*recovery"],
+    ["REC-RECOVERABLE", "Recoverable versus recovered amounts", "Other Coverage and Recovery", "Financial Limitation", "High", "recoverable|could have been recovered|amounts? recovered"],
+    ["REC-OFFSET", "Third-party offset", "Other Coverage and Recovery", "Financial Limitation", "High", "offset.*third party|third[- ]party.*offset|deduct.*recovery"],
+    ["REC-RESPONSIBLE-PARTY", "Responsible-party exclusion", "Other Coverage and Recovery", "Potential Coverage Gap", "Moderate", "responsible third party|legally liable party|liability of another"],
+
+    ["UW-DISCLOSURE", "Underwriting disclosure duty", "Underwriting", "Underwriting/Disclosure Risk", "Critical", "disclosure|disclose|underwriting information|claim disclosure"],
+    ["UW-KNOWN-CLAIM", "Known or potential claim", "Underwriting", "Underwriting/Disclosure Risk", "Critical", "known claim|potential claim|known or expected claim|large claimant"],
+    ["UW-MISREP", "Misrepresentation", "Underwriting", "Underwriting/Disclosure Risk", "Critical", "misrepresentation|material representation|false statement"],
+    ["UW-OMISSION", "Material omission", "Underwriting", "Underwriting/Disclosure Risk", "Critical", "material omission|failure to disclose|omitted information"],
+    ["UW-RESCISSION", "Rescission", "Underwriting", "Underwriting/Disclosure Risk", "Critical", "rescission|rescind|void ab initio"],
+    ["UW-LASER", "Underwriting laser", "Underwriting", "Increased Retained Risk", "Critical", "laser|special risk limitation|individual specific deductible"],
+    ["UW-RENEWAL", "Renewal underwriting restriction", "Underwriting", "Underwriting/Disclosure Risk", "High", "renewal.*underwriting|underwriting.*renewal|renewal condition"],
+    ["UW-CENSUS", "Census threshold", "Underwriting", "Underwriting/Disclosure Risk", "High", "census threshold|minimum enrollment|covered lives.*(?:increase|decrease)|enrollment change"],
+    ["UW-MATERIAL-CLAIM", "Material claim change", "Underwriting", "Underwriting/Disclosure Risk", "High", "material change.*claim|claimant change|shock claim"],
+    ["UW-APPLICATION", "Application incorporated into policy", "Underwriting", "Contract Interpretation Risk", "High", "application.*incorporated|application.*part of (?:this )?policy|statements in the application"],
+
+    ["ADMIN-REPORTING", "High-dollar claim reporting", "Claims Administration", "Administrative Requirement", "High", "reporting threshold|high[- ]dollar reporting|claim.*exceed.*report|notify.*claimant"],
+    ["ADMIN-NOTICE", "Claim notice deadline", "Claims Administration", "Timing Risk", "High", "notice of claim|claim notice|written notice.*days"],
+    ["ADMIN-PROOF", "Proof-of-loss deadline", "Claims Administration", "Timing Risk", "Critical", "proof of loss|proof[- ]of[- ]loss|satisfactory proof"],
+    ["ADMIN-FILING", "Claim filing deadline", "Claims Administration", "Timing Risk", "Critical", "filing deadline|submit.*claim.*days|claim must be filed"],
+    ["ADMIN-AUDIT", "Audit rights", "Claims Administration", "Administrative Requirement", "Moderate", "audit|inspect.*records|examine.*books"],
+    ["ADMIN-RECORDS", "Books and records", "Claims Administration", "Administrative Requirement", "Moderate", "books and records|maintain.*records|records retention"],
+    ["ADMIN-OFFSET", "Carrier offset rights", "Claims Administration", "Financial Limitation", "High", "right to offset|may offset|setoff|set[- ]off"],
+    ["ADMIN-OVERPAYMENT", "Overpayment recovery", "Claims Administration", "Financial Limitation", "High", "overpayment|overpaid|repay.*carrier|return.*reimbursement"],
+    ["ADMIN-REIMBURSE-TIMING", "Reimbursement timing", "Claims Administration", "Timing Risk", "High", "reimburse.*within|reimbursement.*days|payment of reimbursement"],
+    ["ADMIN-ADVANCE", "Advance funding", "Claims Administration", "Favorable Provision", "Moderate", "advance funding|advanced funding|expedited funding|accommodation reimbursement"],
+    ["ADMIN-ADVANCE-CONDITION", "Advance-funding prerequisites", "Claims Administration", "Administrative Requirement", "High", "advance funding.*(?:condition|require|proof|repay|offset)|(?:condition|require|proof|repay|offset).*advance funding"],
+    ["ADMIN-IRO", "External appeal or IRO", "Claims Administration", "Compliance Interaction", "High", "independent review organization|\bIRO\b|external review|external appeal"],
+    ["ADMIN-CLAIM-DETERMINATION", "Carrier claim determination authority", "Claims Administration", "Carrier Discretion", "High", "we determine.*eligible|carrier.*determine.*claim|sole authority.*reimbursement"],
+    ["ADMIN-LATE-PAYMENT", "Delayed payment consequences", "Claims Administration", "Timing Risk", "High", "late payment|delayed payment|timely payment|prompt payment"],
+
+    ["ENF-ARBITRATION", "Arbitration", "Enforcement", "Dispute/Enforcement Provision", "High", "arbitration|arbitral|American Arbitration Association"],
+    ["ENF-MEDIATION", "Mediation", "Enforcement", "Dispute/Enforcement Provision", "Moderate", "mediation|mediate.*dispute"],
+    ["ENF-VENUE", "Venue or forum", "Enforcement", "Dispute/Enforcement Provision", "High", "exclusive venue|forum selection|venue shall|jurisdiction.*court"],
+    ["ENF-GOV-LAW", "Governing law", "Enforcement", "Dispute/Enforcement Provision", "Moderate", "governing law|governed by the laws|choice of law"],
+    ["ENF-LEGAL-LIMIT", "Legal-action limitation", "Enforcement", "Dispute/Enforcement Provision", "Critical", "legal action.*(?:year|month|day)|suit.*must be brought|limitation of action"],
+    ["ENF-INDEMNITY", "Indemnification", "Enforcement", "Dispute/Enforcement Provision", "High", "indemnif|hold harmless|defend and indemnify"],
+    ["ENF-ASSIGNMENT", "Assignment", "Enforcement", "Dispute/Enforcement Provision", "Moderate", "assignment|assign.*policy|rights may not be assigned"],
+    ["ENF-AMENDMENT", "Policy amendment formalities", "Enforcement", "Contract Interpretation Risk", "High", "policy.*amend.*(?:writing|officer)|amendment.*signed|change.*policy.*writing"],
+    ["ENF-TERMINATION", "Termination", "Enforcement", "Dispute/Enforcement Provision", "Critical", "termination of (?:this )?policy|policy terminates|terminate coverage"],
+    ["ENF-RENEWAL", "Renewal", "Enforcement", "Dispute/Enforcement Provision", "High", "renewal|nonrenewal|non-renewal"],
+    ["ENF-CONFLICT", "Policy controls conflicts", "Enforcement", "Contract Interpretation Risk", "High", "conflict.*(?:plan|policy)|(?:policy|schedule).*shall control|this policy.*prevail"],
+    ["ENF-SCHEDULE-CONTROLS", "Schedule controls conflicts", "Enforcement", "Contract Interpretation Risk", "High", "schedule of insurance.*(?:control|prevail)|schedule.*conflict.*policy"],
+
+    ["EXC-ILLEGAL-ACTS", "Illegal acts exclusion", "Exclusions", "Potential Coverage Gap", "High", "illegal act|criminal act|felony|misdemeanor|unlawful conduct"],
+    ["EXC-CONTRACT-LIABILITY", "Contractually assumed liability", "Exclusions", "Potential Coverage Gap", "High", "liability assumed.*contract|contractually assumed liability"],
+    ["EXC-NONCOMPLIANCE", "Plan noncompliance exclusion", "Exclusions", "Compliance Interaction", "High", "failure to comply|noncompliance.*plan|contrary to applicable law"],
+    ["EXC-EX-GRATIA", "Ex gratia or discretionary payment", "Exclusions", "Potential Coverage Gap", "High", "ex gratia|gratuitous payment|voluntary payment|without legal obligation"],
+    ["EXC-LATE-CLAIM", "Late claim exclusion", "Exclusions", "Timing Risk", "Critical", "untimely claim|late claim|not submitted timely"],
+    ["EXC-FOREIGN", "Foreign treatment", "Exclusions", "Potential Coverage Gap", "Moderate", "treatment outside.*United States|foreign country|international treatment"],
+    ["EXC-WAR", "War and terrorism", "Exclusions", "Potential Coverage Gap", "Moderate", "war|terrorism|act of war|armed conflict"],
+    ["EXC-PANDEMIC", "Pandemic or epidemic", "Exclusions", "Potential Coverage Gap", "High", "pandemic|epidemic|communicable disease exclusion"],
+    ["EXC-NONCOVERED-PROVIDER", "Provider-status limitation", "Exclusions", "Potential Coverage Gap", "High", "ineligible provider|excluded provider|noncovered provider"],
+    ["EXC-SANCTIONS", "Sanctions and prohibited payment", "Exclusions", "Compliance Interaction", "Moderate", "economic sanctions|OFAC|prohibited payment"],
+
+    ["FAV-MIRROR-DELETES", "Mirroring deletes base exclusions", "Favorable Provisions", "Favorable Provision", "Low", "(?:delete|remove).*exclusion|exclusions? (?:are|is) deleted"],
+    ["FAV-ADVANCE", "Advance funding available", "Favorable Provisions", "Favorable Provision", "Low", "expedited advance funding|advance funding endorsement"],
+    ["FAV-NO-LASER", "No-new-laser renewal protection", "Favorable Provisions", "Favorable Provision", "Low", "no new special risk limitation|no new laser"],
+    ["FAV-UNLIMITED", "Unlimited reimbursement maximum", "Favorable Provisions", "Favorable Provision", "Low", "unlimited (?:lifetime|policy period|maximum).*reimbursement|maximum.*unlimited"],
+    ["FAV-TERMINAL", "Terminal liability available", "Favorable Provisions", "Favorable Provision", "Low", "terminal liability (?:included|available)|terminal extension"],
+    ["FAV-RATE-CAP", "Renewal rate protection", "Favorable Provisions", "Favorable Provision", "Low", "renewal rate cap endorsement|rate increase shall not exceed"],
+    ["FAV-APPEAL-EXTENSION", "Appeal or IRO payment extension", "Favorable Provisions", "Favorable Provision", "Low", "extended benefit.*(?:appeal|IRO)|appeal.*extended benefit"],
+    ["FAV-GAPLESS", "Gapless run-out", "Favorable Provisions", "Favorable Provision", "Low", "gapless|no gap.*run[- ]out|continuous run[- ]out"],
+    ["FAV-WAIVER", "Carrier waiver of limitation", "Favorable Provisions", "Favorable Provision", "Low", "waive.*limitation|waiver.*exclusion|exception approved"],
+    ["FAV-CONTINUITY", "Continuity protection", "Favorable Provisions", "Favorable Provision", "Low", "continuity of coverage|continuation protection|prior carrier credit"]
+  ];
+
+  const custom = {
+    "FIN-SPECIFIC-ATTACHMENT": {
+      whyItMatters: "This is the plan's retained risk per covered person before specific reimbursement begins.",
+      reviewerQuestions: ["Is the amount uniform, class-specific, or claimant-specific?", "Does a proposal change it without changing the stated rate-cap protection?"],
+      recommendedAction: "Verify every schedule, proposal, endorsement, and laser before drawing a retained-risk conclusion."
+    },
+    "FIN-RATE-CAP": {
+      whyItMatters: "A rate cap may protect only named pricing variables and may contain conditions that alter or defeat the protection.",
+      reviewerQuestions: ["Which variables are expressly capped?", "Is a specific attachment-point change listed only as a material-change condition?"],
+      recommendedAction: "Quote the protected variables and conditions separately. Do not describe all economics as capped."
+    },
+    "FIN-PLAN-MIRROR": {
+      whyItMatters: "Mirroring may narrow reimbursement gaps but often depends on timely document delivery, unchanged plan terms, and stated withdrawal conditions.",
+      reviewerQuestions: ["Which exclusions are deleted or modified?", "What permits the carrier to withdraw mirroring?"],
+      recommendedAction: "Link each modifying clause to the affected base provision and preserve the superseded language as history."
+    },
+    "REC-MEDICARE-COB": {
+      whyItMatters: "Eligibility, entitlement, enrollment, and Medicare Secondary Payer status are distinct concepts.",
+      recommendedAction: "Do not treat Medicare eligibility as equivalent to entitlement without supporting language."
+    },
+    "REC-RECOVERABLE": {
+      whyItMatters: "A carrier may offset amounts it believes could have been recovered even if the plan never actually recovered them.",
+      recommendedAction: "Distinguish recoverable amounts from amounts actually recovered."
+    },
+    "ADMIN-ADVANCE": {
+      whyItMatters: "Advance funding can improve cash flow while prerequisites, last-period restrictions, repayment duties, and offsets can narrow its practical value.",
+      recommendedAction: "Extract the feature and every prerequisite as separate linked provisions."
+    },
+    "ENF-SCHEDULE-CONTROLS": {
+      hierarchyBehavior: "schedule_controls",
+      recommendedAction: "Give controlling schedule terms priority while retaining conflicting base-policy text as superseded or subordinate."
+    },
+    "FAV-MIRROR-DELETES": {
+      hierarchyBehavior: "delete_target",
+      recommendedAction: "Mark the targeted base exclusion superseded only when the modifying relationship is supported by the text."
+    }
+  };
+
+  function makeRule(row) {
+    const [id, title, category, classification, severity, pattern] = row;
+    const overrides = custom[id] || {};
+    return Object.assign({
+      id,
+      version: VERSION,
+      title,
+      category,
+      issueClassification: classification,
+      defaultSeverity: severity,
+      detection: { patterns: [pattern], flags: "gi", contextWindow: 900 },
+      contextRequirements: [],
+      positiveIndicators: [pattern],
+      negativeIndicators: [],
+      forbiddenContexts: ["table of contents only"],
+      hierarchyBehavior: "preserve_and_link",
+      comparisonBehavior: "concept_pair",
+      missingConceptBehavior: "not_located_not_gap",
+      analysis: `The document contains operative language concerning ${title.toLowerCase()}. The reviewer should evaluate the complete clause, related definitions, schedules, and endorsements before reaching a conclusion.`,
+      whyItMatters: `${title} can affect reimbursement, retained risk, administration, or contract interpretation depending on the controlling language and review mode.`,
+      reviewerQuestions: ["Is this language current and controlling?", "Does another document modify, narrow, or supersede it?"],
+      recommendedAction: "Review the full clause in context and confirm its relationship to the plan, proposal, schedule, and endorsements.",
+      negotiationPoint: "Request written clarification if the operative effect is ambiguous or materially changes expected risk transfer.",
+      regression: { positive: [], negative: [] },
+      ambiguityNotes: "Detection is a review lead, not a legal conclusion."
+    }, overrides);
+  }
+
+  const rules = rows.map(makeRule);
+  return Object.freeze({ version: VERSION, rules: Object.freeze(rules) });
+});
+
+</script>
+  <script>
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  root.StopLossDocumentModel = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const CONTROL_RE = /\b(schedule (?:of insurance )?(?:controls?|prevails?)|policy (?:controls?|prevails?)|plan (?:controls?|prevails?)|notwithstanding|this (?:endorsement|amendment) (?:modifies|changes|deletes|replaces|amends)|remov(?:e|es|ed)|delet(?:e|es|ed)|replac(?:e|es|ed)|amended to read|add(?:s|ed)?|incorporated into)\b/i;
+  const HEADING_RE = /^(?:ARTICLE|SECTION|PART|SCHEDULE|ENDORSEMENT|AMENDMENT|EXHIBIT|ADDENDUM|RIDER|DEFINITIONS?|EXCLUSIONS?|ELIGIBILITY|CLAIMS?|GENERAL PROVISIONS?|BENEFITS?)\b|^(?:\d+(?:\.\d+)*|[A-Z]|[IVXLC]+)[.)]\s+[A-Z]/;
+
+  function normalizeText(value) {
+    return String(value == null ? "" : value)
+      .replace(/\u0000/g, "")
+      .replace(/\r\n?/g, "\n")
+      .replace(/([A-Za-z])-\s*\n\s*([a-z])/g, "$1$2")
+      .replace(/[\t\u00a0]+/g, " ")
+      .replace(/[ ]{2,}/g, " ")
+      .replace(/\n[ ]+/g, "\n")
+      .trim();
+  }
+
+  function inferRole(name, text, suppliedRole) {
+    if (suppliedRole) return suppliedRole;
+    const sample = `${name}\n${text.slice(0, 3000)}`;
+    if (/proposal|quote|illustration|binder/i.test(sample)) return "proposal";
+    if (/amendment/i.test(sample)) return "amendment";
+    if (/endorsement|rider/i.test(sample)) return "endorsement";
+    if (/summary plan description|\bSPD\b|employee benefit plan/i.test(sample)) return "plan";
+    return "policy";
+  }
+
+  function lineFingerprint(line) {
+    return line.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+  }
+
+  function removeRepeatedMargins(pages) {
+    if (pages.length < 3) return pages;
+    const counts = new Map();
+    pages.forEach(page => {
+      const lines = page.text.split("\n").map(x => x.trim()).filter(Boolean);
+      const candidates = lines.slice(0, 3).concat(lines.slice(-3));
+      new Set(candidates.map(lineFingerprint).filter(x => x.length > 3)).forEach(x => counts.set(x, (counts.get(x) || 0) + 1));
+    });
+    const repeated = new Set(Array.from(counts).filter(([, n]) => n / pages.length >= 0.6).map(([x]) => x));
+    return pages.map(page => ({
+      number: page.number,
+      text: page.text.split("\n").filter(line => !repeated.has(lineFingerprint(line))).join("\n").trim(),
+      originalText: page.originalText
+    }));
+  }
+
+  function pageHealth(page) {
+    const letters = (page.text.match(/[A-Za-z]/g) || []).length;
+    const replacement = (page.text.match(/\ufffd/g) || []).length;
+    const status = letters < 20 ? "Unreadable or image-only" : letters < 100 ? "Low extractable text" : replacement > Math.max(3, letters * 0.02) ? "Encoding concerns" : "Readable";
+    return { page: page.number, status, extractableCharacters: letters, requiresOCR: letters < 20 };
+  }
+
+  function isHeading(line) {
+    const value = line.trim();
+    if (!value || value.length > 150) return false;
+    if (HEADING_RE.test(value)) return true;
+    const letters = value.replace(/[^A-Za-z]/g, "");
+    return letters.length >= 4 && value === value.toUpperCase() && !/[.!?]$/.test(value);
+  }
+
+  function segmentPage(page, documentId, name) {
+    const lines = page.text.split("\n");
+    const clauses = [];
+    let section = "Unlabeled section";
+    let buffer = [];
+    let startLine = 1;
+
+    function flush(endLine) {
+      const text = buffer.join(" ").replace(/\s+/g, " ").trim();
+      if (text) {
+        clauses.push({
+          id: `${documentId}-p${page.number}-c${clauses.length + 1}`,
+          documentId,
+          sourceDocument: name,
+          page: page.number,
+          section,
+          lineStart: startLine,
+          lineEnd: endLine,
+          text,
+          normalizedText: text.toLowerCase(),
+          hierarchySignal: CONTROL_RE.test(text)
+        });
+      }
+      buffer = [];
+    }
+
+    lines.forEach((raw, index) => {
+      const line = raw.trim();
+      if (!line) {
+        flush(index + 1);
+        startLine = index + 2;
+        return;
+      }
+      if (isHeading(line)) {
+        flush(index);
+        section = line;
+        startLine = index + 1;
+        buffer = [line];
+        return;
+      }
+      if (buffer.length && /^(?:\d+(?:\.\d+)*|[A-Z]|[ivx]+)[.)]\s+/i.test(line) && buffer.join(" ").length > 180) {
+        flush(index);
+        startLine = index + 1;
+      }
+      buffer.push(line);
+      if (buffer.join(" ").length > 2400) {
+        flush(index + 1);
+        startLine = index + 2;
+      }
+    });
+    flush(lines.length);
+    return clauses;
+  }
+
+  function parseDocument(input) {
+    const name = input.name || "Untitled document";
+    const id = input.id || `doc-${Math.random().toString(36).slice(2, 10)}`;
+    const rawPages = Array.isArray(input.pages) && input.pages.length
+      ? input.pages.map((p, i) => ({ number: p.number || i + 1, originalText: String(p.text || ""), text: normalizeText(p.text) }))
+      : normalizeText(input.text).split(/\f|\n\s*\[\[PAGE BREAK\]\]\s*\n/i).map((text, i) => ({ number: i + 1, originalText: text, text: normalizeText(text) }));
+    const pages = removeRepeatedMargins(rawPages);
+    const allText = pages.map(p => p.text).join("\n\n");
+    const role = inferRole(name, allText, input.role);
+    const clauses = pages.flatMap(page => segmentPage(page, id, name));
+    const health = pages.map(pageHealth);
+    const unreadablePages = health.filter(x => x.requiresOCR).map(x => x.page);
+    return {
+      id,
+      name,
+      role,
+      sequence: Number.isFinite(input.sequence) ? input.sequence : 0,
+      pages,
+      clauses,
+      text: allText,
+      health: {
+        status: unreadablePages.length ? "Review required" : "Readable",
+        pages: health,
+        unreadablePages,
+        warning: unreadablePages.length ? `Pages requiring OCR or manual inspection: ${unreadablePages.join(", ")}` : "No image-only pages detected from extracted text."
+      }
+    };
+  }
+
+  return { normalizeText, inferRole, removeRepeatedMargins, segmentPage, parseDocument, isHeading };
+});
+
+</script>
+  <script>
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  root.StopLossWorkbenchEngine = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  const FACT_DEFINITIONS = [
+    ["carrier", "Carrier", "(?:issued by|underwritten by|carrier[:\\s]+)([A-Z][A-Za-z&.,' -]{2,80}(?:Insurance Company|Life Insurance Company|Insurance Co\\.?))"],
+    ["policyholder", "Policyholder", "(?:policyholder|policy holder|insured|employer)[:\\s]+([A-Z][^\\n;]{2,100})"],
+    ["policy_number", "Policy number", "(?:policy (?:number|no\\.?|#))[:\\s#]*([A-Z0-9-]{4,40})"],
+    ["jurisdiction", "Jurisdiction / state issued", "(?:state issued|jurisdiction|governing law)[:\\s]+([A-Z][A-Za-z ]{2,40})"],
+    ["policy_term", "Policy term", "(?:policy term|policy period)[:\\s]+([^\\n;]{5,100})"],
+    ["effective_date", "Effective date", "(?:effective date|effective)[:\\s]+((?:January|February|March|April|May|June|July|August|September|October|November|December) \\d{1,2}, \\d{4}|\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"],
+    ["expiration_date", "Expiration date", "(?:expiration date|expires?)[:\\s]+((?:January|February|March|April|May|June|July|August|September|October|November|December) \\d{1,2}, \\d{4}|\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"],
+    ["claim_administrator", "Claim administrator", "(?:claim administrator|claims administrator|third[- ]party administrator|TPA)[:\\s]+([^\\n;]{2,100})"],
+    ["pbm", "PBM", "(?:pharmacy benefit manager|PBM)[:\\s]+([^\\n;]{2,100})"],
+    ["network", "Network", "(?:provider network|network)[:\\s]+([^\\n;]{2,100})"],
+    ["cost_containment", "Cost containment vendor", "(?:cost containment vendor|cost containment)[:\\s]+([^\\n;]{2,100})"],
+    ["rbp_vendor", "RBP vendor", "(?:reference[- ]based pricing vendor|RBP vendor)[:\\s]+([^\\n;]{2,100})"],
+    ["specific_attachment", "Specific attachment point", "(?:specific deductible|specific attachment point|annual specific deductible)[:\\s$]*([0-9][0-9,]*(?:\\.\\d{2})?)"],
+    ["alternate_attachment", "Alternate / contingent attachment point", "(?:alternate|contingent|special risk) (?:specific deductible|attachment point)[:\\s$]*([0-9][0-9,]*(?:\\.\\d{2})?)"],
+    ["aggregating_specific", "Aggregating specific deductible", "(?:aggregating specific deductible|aggregate specific deductible|additional plan liability)[:\\s$]*([0-9][0-9,]*(?:\\.\\d{2})?)"],
+    ["aggregate_attachment", "Aggregate attachment point / factor", "(?:aggregate attachment point|aggregate factor|minimum aggregate attachment)[:\\s$]*([^\\n;]{2,80})"],
+    ["specific_percentage", "Specific payable percentage", "(?:specific payable percentage|specific reimbursement percentage|specific coinsurance)[:\\s]*(\\d{1,3}\\s*%)"],
+    ["aggregate_percentage", "Aggregate payable percentage", "(?:aggregate payable percentage|aggregate reimbursement percentage|aggregate coinsurance)[:\\s]*(\\d{1,3}\\s*%)"],
+    ["maximums", "Annual / lifetime / policy maximum", "(?:maximum (?:benefit|reimbursement|liability)|lifetime maximum|policy period maximum)[:\\s$]*([^\\n;]{2,80})"],
+    ["benefit_basis", "Contract / benefit basis", "(?:contract type|contract basis|benefit basis)[:\\s]+([^\\n;]{2,80}|(?:12|15|18|24|36|48|60|72)[/-](?:12|15|18|24|36))"],
+    ["incurred_window", "Incurred window", "(?:incurred (?:from|between|during)|incurred window)[:\\s]+([^\\n;]{3,100})"],
+    ["paid_window", "Paid window", "(?:paid (?:from|between|during)|paid window)[:\\s]+([^\\n;]{3,100})"],
+    ["run_in", "Run-in", "(?:run[- ]?in)[:\\s]+([^\\n;]{2,80})"],
+    ["run_out", "Run-out", "(?:run[- ]?out)[:\\s]+([^\\n;]{2,80})"],
+    ["terminal_liability", "Terminal liability", "(?:terminal liability)[:\\s]+([^\\n;]{2,80})"],
+    ["advance_funding", "Advance funding", "((?:expedited )?advance(?:d)? funding)"],
+    ["plan_mirroring", "Plan mirroring", "(plan mirroring|mirrors? the plan)"],
+    ["no_new_laser", "No-new-laser protection", "(no new (?:laser|special risk limitation))"],
+    ["rate_cap", "Rate-cap protection", "((?:renewal )?rate cap|rate increase shall not exceed[^\\n;]{0,50})"],
+    ["reporting_threshold", "High-dollar reporting threshold", "(?:reporting threshold|report claims? (?:expected )?to exceed)[:\\s$]*([0-9][0-9,]*)"],
+    ["notice_deadline", "Claim notice deadline", "(?:notice of claim|claim notice)[^\\n;]{0,60}?(\\d+\\s+(?:days?|months?))"],
+    ["proof_deadline", "Proof-of-loss deadline", "(?:proof of loss|proof[- ]of[- ]loss)[^\\n;]{0,80}?(\\d+\\s+(?:days?|months?))"],
+    ["premium_grace", "Premium / grace terms", "(?:grace period)[^\\n;]{0,50}?(\\d+\\s+days?)"],
+    ["endorsements", "Attached endorsements", "((?:endorsement|rider|amendment) (?:number|no\\.?|#)?\\s*[A-Z0-9-]+[^\\n;]{0,80})"]
+  ].map(([id, label, pattern]) => ({ id, label, pattern, flags: "gi" }));
+
+  const ACTIONS = [
+    ["delete", /\b(?:remov(?:e|es|ed)|delet(?:e|es|ed)|strik(?:e|es|en))\b/i],
+    ["replace", /\b(?:replac(?:e|es|ed)|amended to read|and replace with)\b/i],
+    ["add", /\b(?:add|adds|added|incorporated into)\b/i],
+    ["priority", /\b(?:controls?|prevails?|notwithstanding)\b/i],
+    ["modify", /\b(?:modifies|changes|amends)\b/i]
+  ];
+
+  function compile(pattern, flags) {
+    try { return new RegExp(pattern, flags || "gi"); }
+    catch (error) { return null; }
+  }
+
+  function occurrenceKey(ruleId, clause, match) {
+    return `${ruleId}|${clause.documentId}|${clause.page}|${clause.id}|${match.index}|${match[0].toLowerCase()}`;
+  }
+
+  function confidenceFor(rule, match, clause) {
+    const exact = match[0].trim().split(/\s+/).length >= 2;
+    if (exact && clause.text.length <= 1800) return { level: "High", rationale: "A multi-word rule indicator appears in a bounded operative clause." };
+    if (exact) return { level: "Moderate", rationale: "A rule indicator appears in a long clause that requires contextual review." };
+    return { level: "Low", rationale: "A short indicator appears and may be ambiguous outside its full provision." };
+  }
+
+  function analyzeDocument(document, rules) {
+    const occurrences = [];
+    const seen = new Set();
+    rules.forEach(rule => {
+      const patterns = rule.detection && rule.detection.patterns || [];
+      document.clauses.forEach(clause => {
+        patterns.forEach(pattern => {
+          const regex = compile(pattern, rule.detection.flags || "gi");
+          if (!regex) return;
+          let match;
+          while ((match = regex.exec(clause.text)) !== null) {
+            const key = occurrenceKey(rule.id, clause, match);
+            if (!seen.has(key)) {
+              seen.add(key);
+              const confidence = confidenceFor(rule, match, clause);
+              occurrences.push({
+                id: `occ-${occurrences.length + 1}-${rule.id}`,
+                ruleId: rule.id,
+                documentId: document.id,
+                sourceDocument: document.name,
+                documentRole: document.role,
+                sequence: document.sequence,
+                page: clause.page,
+                section: clause.section,
+                exactTrigger: match[0],
+                operativeLanguage: clause.text,
+                surroundingContext: clause.text,
+                clauseId: clause.id,
+                hierarchyStatus: "current",
+                supersededBy: null,
+                confidence: confidence.level,
+                confidenceRationale: confidence.rationale
+              });
+            }
+            if (!match[0]) regex.lastIndex += 1;
+          }
+        });
+      });
+    });
+    return occurrences;
+  }
+
+  function extractFacts(document) {
+    const facts = [];
+    FACT_DEFINITIONS.forEach(def => {
+      const regex = compile(def.pattern, def.flags);
+      if (!regex) return;
+      document.clauses.forEach(clause => {
+        regex.lastIndex = 0;
+        let match;
+        while ((match = regex.exec(clause.text)) !== null) {
+          const value = String(match[1] || match[0]).replace(/\s+/g, " ").trim().replace(/[.,;:]$/, "");
+          if (value && !facts.some(f => f.fieldId === def.id && f.value.toLowerCase() === value.toLowerCase() && f.documentId === document.id)) {
+            facts.push({
+              id: `fact-${document.id}-${def.id}-${facts.length + 1}`,
+              fieldId: def.id,
+              label: def.label,
+              value,
+              sourceDocument: document.name,
+              documentId: document.id,
+              page: clause.page,
+              section: clause.section,
+              sourceText: clause.text,
+              confidence: match[1] ? "High" : "Moderate",
+              reviewerValue: null,
+              reviewerStatus: "Unreviewed"
+            });
+          }
+          if (!match[0]) regex.lastIndex += 1;
+        }
+      });
+    });
+    return facts;
+  }
+
+  function actionFor(text) {
+    const found = ACTIONS.find(([, regex]) => regex.test(text));
+    return found ? found[0] : null;
+  }
+
+  function hierarchyEvents(documents, rules) {
+    const events = [];
+    documents.forEach(document => {
+      document.clauses.filter(c => c.hierarchySignal || /amendment|endorsement|schedule/i.test(c.section)).forEach(clause => {
+        const action = actionFor(clause.text);
+        if (!action) return;
+        const affectedRuleIds = [];
+        rules.forEach(rule => {
+          if ((rule.detection.patterns || []).some(pattern => {
+            const regex = compile(pattern, "i");
+            return regex && regex.test(clause.text);
+          })) affectedRuleIds.push(rule.id);
+        });
+        const pair = clause.text.match(/\b(?:REMOVE|DELETE|STRIKE)\b[:\s]+(.{1,900}?)\b(?:AND REPLACE WITH|REPLACE WITH|ADD)\b[:\s]+(.{1,1400})/i);
+        events.push({
+          id: `hier-${events.length + 1}`,
+          documentId: document.id,
+          sourceDocument: document.name,
+          documentRole: document.role,
+          sequence: document.sequence,
+          page: clause.page,
+          section: clause.section,
+          action,
+          affectedRuleIds,
+          originalLanguage: pair ? pair[1].trim() : null,
+          replacementLanguage: pair ? pair[2].trim() : null,
+          modifyingLanguage: clause.text,
+          confidence: affectedRuleIds.length ? "Moderate" : "Low",
+          rationale: affectedRuleIds.length ? "The modifying clause contains an indicator for the affected concept." : "A hierarchy verb is present, but the affected concept could not be mapped deterministically."
+        });
+      });
+    });
+    return events;
+  }
+
+  function applyHierarchy(occurrences, events) {
+    const destructive = new Set(["delete", "replace"]);
+    events.filter(event => destructive.has(event.action) && event.affectedRuleIds.length).forEach(event => {
+      occurrences.forEach(occurrence => {
+        const isOlder = occurrence.sequence < event.sequence || (occurrence.sequence === event.sequence && occurrence.documentId !== event.documentId && occurrence.documentRole !== "endorsement" && occurrence.documentRole !== "amendment");
+        if (isOlder && event.affectedRuleIds.includes(occurrence.ruleId)) {
+          occurrence.hierarchyStatus = "superseded";
+          occurrence.supersededBy = event.id;
+        }
+      });
+    });
+    occurrences.forEach(occurrence => {
+      if ((occurrence.documentRole === "amendment" || occurrence.documentRole === "endorsement") && occurrence.hierarchyStatus === "current") {
+        occurrence.hierarchyStatus = "controlling modifier";
+      }
+    });
+    return occurrences;
+  }
+
+  function buildFindings(occurrences, rules, mode) {
+    const byRule = new Map();
+    rules.forEach(rule => byRule.set(rule.id, []));
+    occurrences.forEach(occurrence => {
+      if (!byRule.has(occurrence.ruleId)) byRule.set(occurrence.ruleId, []);
+      byRule.get(occurrence.ruleId).push(occurrence);
+    });
+    return rules.filter(rule => byRule.get(rule.id).length).map(rule => {
+      const all = byRule.get(rule.id).sort((a, b) => a.sequence - b.sequence || a.page - b.page);
+      const current = all.filter(o => o.hierarchyStatus !== "superseded");
+      const lead = current[0] || all[0];
+      const confidence = current.some(o => o.confidence === "High") ? "High" : current.some(o => o.confidence === "Moderate") ? "Moderate" : "Low";
+      return {
+        id: `finding-${rule.id}`,
+        ruleId: rule.id,
+        title: rule.title,
+        category: rule.category,
+        classification: mode === "standalone" && rule.issueClassification === "Confirmed Plan/Policy Difference" ? "Potential Coverage Gap" : rule.issueClassification,
+        severity: rule.defaultSeverity,
+        confidence,
+        sourceDocument: lead.sourceDocument,
+        page: lead.page,
+        section: lead.section,
+        hierarchyStatus: current.length ? lead.hierarchyStatus : "superseded only",
+        exactLanguage: lead.operativeLanguage,
+        context: lead.surroundingContext,
+        whyItMatters: rule.whyItMatters,
+        practicalConsequence: rule.analysis,
+        recommendedAction: rule.recommendedAction,
+        negotiationPoint: rule.negotiationPoint,
+        reviewerQuestions: rule.reviewerQuestions,
+        occurrences: all,
+        reviewerNotes: "",
+        disposition: "Needs Review",
+        included: rule.issueClassification !== "Informational",
+        ruleVersion: rule.version
+      };
+    });
+  }
+
+  function completenessMatrix(rules, occurrences, documents) {
+    const unreadable = documents.some(d => d.health.unreadablePages.length);
+    return rules.map(rule => {
+      const found = occurrences.filter(o => o.ruleId === rule.id && o.hierarchyStatus !== "superseded");
+      const superseded = occurrences.filter(o => o.ruleId === rule.id && o.hierarchyStatus === "superseded");
+      let status = "Not located";
+      if (found.length > 1) status = "Multiple provisions located";
+      else if (found.length === 1) status = found[0].confidence === "Low" ? "Possibly addressed" : "Located";
+      else if (superseded.length) status = "Possibly addressed";
+      else if (unreadable) status = "Unable to determine";
+      return {
+        conceptId: rule.id,
+        concept: rule.title,
+        category: rule.category,
+        status,
+        rationale: found.length ? `${found.length} current occurrence(s) retained with provenance.` : superseded.length ? "Only superseded language was located." : unreadable ? "No current occurrence was located, and one or more pages require OCR or manual inspection." : "No indicator was located in the extractable text. This is not a legal conclusion or a confirmed gap.",
+        searchedFor: rule.positiveIndicators,
+        occurrences: found.map(o => ({ document: o.sourceDocument, page: o.page, section: o.section }))
+      };
+    });
+  }
+
+  function priorityRank(value) {
+    return { Critical: 0, High: 1, Moderate: 2, Low: 3, Informational: 4 }[value] ?? 5;
+  }
+
+  function matterSummary(findings, documents, events) {
+    const current = findings.filter(f => f.hierarchyStatus !== "superseded only");
+    const priority = current.filter(f => priorityRank(f.severity) <= 1);
+    const favorable = current.filter(f => f.classification === "Favorable Provision");
+    const unreadable = documents.flatMap(d => d.health.unreadablePages.map(page => `${d.name} p. ${page}`));
+    return {
+      text: `${documents.length} document(s) were parsed into operative clauses. The deterministic review produced ${current.length} current finding concept(s), including ${priority.length} critical/high-priority concept(s) and ${favorable.length} favorable concept(s). Detection identifies review leads, not legal conclusions.`,
+      counts: { documents: documents.length, findings: current.length, priority: priority.length, favorable: favorable.length, hierarchyEvents: events.length },
+      unreadablePages: unreadable
+    };
+  }
+
+  function analyzeMatter(documents, ruleLibrary, mode) {
+    const rules = ruleLibrary.rules || ruleLibrary;
+    const ordered = documents.slice().sort((a, b) => a.sequence - b.sequence);
+    const occurrences = ordered.flatMap(document => analyzeDocument(document, rules));
+    const events = hierarchyEvents(ordered, rules);
+    applyHierarchy(occurrences, events);
+    const findings = buildFindings(occurrences, rules, mode || "standalone").sort((a, b) => priorityRank(a.severity) - priorityRank(b.severity) || a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+    const facts = ordered.flatMap(extractFacts);
+    const completeness = completenessMatrix(rules, occurrences, ordered);
+    return {
+      schemaVersion: "1.0.0",
+      engineVersion: "16.0.0",
+      ruleLibraryVersion: ruleLibrary.version || "unknown",
+      mode: mode || "standalone",
+      createdAt: new Date().toISOString(),
+      documents: ordered,
+      facts,
+      hierarchyEvents: events,
+      findings,
+      completeness,
+      summary: matterSummary(findings, ordered, events)
+    };
+  }
+
+  return {
+    FACT_DEFINITIONS,
+    analyzeDocument,
+    extractFacts,
+    hierarchyEvents,
+    applyHierarchy,
+    buildFindings,
+    completenessMatrix,
+    analyzeMatter
+  };
+});
+
+</script>
+  <script>
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === "object" && module.exports) module.exports = api;
+  root.StopLossComparisonEngine = api;
+})(typeof globalThis !== "undefined" ? globalThis : this, function () {
+  "use strict";
+
+  function tokens(text) {
+    return new Set(String(text || "").toLowerCase().replace(/[^a-z0-9%$]+/g, " ").split(/\s+/).filter(x => x.length > 2));
+  }
+
+  function similarity(a, b) {
+    const left = tokens(a);
+    const right = tokens(b);
+    if (!left.size && !right.size) return 1;
+    const intersection = Array.from(left).filter(x => right.has(x)).length;
+    return intersection / Math.max(1, new Set([...left, ...right]).size);
+  }
+
+  function currentOccurrence(finding) {
+    if (!finding) return null;
+    return finding.occurrences.find(o => o.hierarchyStatus !== "superseded") || finding.occurrences[0] || null;
+  }
+
+  function modeColumns(mode) {
+    if (mode === "plan-policy") return ["Plan Language", "Stop-Loss Language", "Difference", "Consequence", "Recommended Action"];
+    if (mode === "renewal") return ["Prior Term", "Renewal Term", "Nature of Change", "Risk-Transfer Effect", "Recommended Review"];
+    return ["Proposal / Quote / Binder", "Issued Policy", "Difference", "Contract Effect", "Recommended Action"];
+  }
+
+  function compareAnalyses(left, right, mode) {
+    const leftMap = new Map(left.findings.map(f => [f.ruleId, f]));
+    const rightMap = new Map(right.findings.map(f => [f.ruleId, f]));
+    const ids = Array.from(new Set([...leftMap.keys(), ...rightMap.keys()])).sort();
+    const rows = ids.map(ruleId => {
+      const l = leftMap.get(ruleId) || null;
+      const r = rightMap.get(ruleId) || null;
+      const lo = currentOccurrence(l);
+      const ro = currentOccurrence(r);
+      const score = similarity(lo && lo.operativeLanguage, ro && ro.operativeLanguage);
+      let nature = "Unchanged or closely corresponding";
+      if (!l && r) nature = mode === "renewal" ? "Added in renewal" : "Present only in issued policy";
+      else if (l && !r) nature = mode === "renewal" ? "Removed or not located in renewal" : "Promised or described, but not located in issued policy";
+      else if (score < 0.72) nature = "Modified language";
+      const materialDifference = nature !== "Unchanged or closely corresponding";
+      let consequence = (r || l).whyItMatters;
+      if (mode === "proposal-policy" && l && !r) consequence = "A proposal representation is not itself an issued-policy term. The expected feature requires contract confirmation.";
+      if (mode === "plan-policy" && materialDifference && l && r) consequence = "The paired plan and stop-loss clauses differ materially enough to require attorney review of reimbursement consequences.";
+      return {
+        id: `comparison-${ruleId}`,
+        ruleId,
+        concept: (r || l).title,
+        category: (r || l).category,
+        leftLanguage: lo ? lo.operativeLanguage : "Not located in extractable text",
+        leftSource: lo ? { document: lo.sourceDocument, page: lo.page, section: lo.section } : null,
+        rightLanguage: ro ? ro.operativeLanguage : "Not located in extractable text",
+        rightSource: ro ? { document: ro.sourceDocument, page: ro.page, section: ro.section } : null,
+        nature,
+        similarity: Number(score.toFixed(3)),
+        consequence,
+        recommendedAction: (r || l).recommendedAction,
+        classification: mode === "plan-policy" && materialDifference && l && r ? "Confirmed Plan/Policy Difference" : (r || l).classification,
+        severity: (r || l).severity,
+        disposition: "Needs Review",
+        included: materialDifference
+      };
+    });
+    return { mode, columns: modeColumns(mode), rows };
+  }
+
+  function numericValue(value) {
+    const match = String(value || "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : null;
+  }
+
+  function compareFinancialFacts(leftFacts, rightFacts) {
+    const financial = new Set(["specific_attachment", "alternate_attachment", "aggregating_specific", "aggregate_attachment", "specific_percentage", "aggregate_percentage", "maximums", "benefit_basis", "premium_grace", "rate_cap"]);
+    const firstById = list => {
+      const map = new Map();
+      list.forEach(f => { if (!map.has(f.fieldId)) map.set(f.fieldId, f); });
+      return map;
+    };
+    const left = firstById(leftFacts);
+    const right = firstById(rightFacts);
+    const ids = Array.from(new Set([...left.keys(), ...right.keys()])).filter(id => financial.has(id));
+    return ids.map(id => {
+      const l = left.get(id) || null;
+      const r = right.get(id) || null;
+      const ln = numericValue(l && l.value);
+      const rn = numericValue(r && r.value);
+      const change = ln !== null && rn !== null && ln !== 0 ? ((rn - ln) / Math.abs(ln)) * 100 : null;
+      return {
+        fieldId: id,
+        label: (r || l).label,
+        priorValue: l ? l.value : "Not located",
+        currentValue: r ? r.value : "Not located",
+        percentChange: change === null ? null : Number(change.toFixed(1)),
+        interpretation: id === "specific_attachment" && change > 0 ? "Increased retained risk per covered person" : id === "aggregating_specific" && change > 0 ? "Increased retained aggregate-specific exposure" : change === 0 ? "No numeric change detected" : "Review the financial and contractual context",
+        warning: /premium|commission/.test(id) ? "Normalize commission assumptions before comparing premium." : null
+      };
+    });
+  }
+
+  function buildComparison(left, right, mode) {
+    const paired = compareAnalyses(left, right, mode);
+    return Object.assign(paired, {
+      schemaVersion: "1.0.0",
+      engineVersion: "16.0.0",
+      financialTerms: compareFinancialFacts(left.facts, right.facts),
+      caution: mode === "proposal-policy" ? "Proposal, quote, and binder language is tracked separately from binding issued-policy language." : mode === "renewal" ? "Premium movement and retained-risk movement are reported separately." : "A confirmed difference requires actual paired language; a missing indicator alone is not a confirmed gap."
+    });
+  }
+
+  return { tokens, similarity, modeColumns, compareAnalyses, numericValue, compareFinancialFacts, buildComparison };
+});
+
+</script>
+  <script>
+(function () {
+  "use strict";
+
+  const DocumentModel = globalThis.StopLossDocumentModel;
+  const Engine = globalThis.StopLossWorkbenchEngine;
+  const Comparison = globalThis.StopLossComparisonEngine;
+  const RuleLibrary = globalThis.StopLossRuleLibrary;
+
+  const state = {
+    mode: "standalone",
+    leftAnalysis: null,
+    rightAnalysis: null,
+    analysis: null,
+    comparison: null,
+    section: "overview"
+  };
+
+  const $ = id => document.getElementById(id);
+  const ui = {
+    startView: $("startView"), workspaceView: $("workspaceView"), workflowGrid: $("workflowGrid"),
+    leftFiles: $("leftFiles"), rightFiles: $("rightFiles"), leftFileList: $("leftFileList"), rightFileList: $("rightFileList"),
+    leftManual: $("leftManual"), rightManual: $("rightManual"), rightCard: $("rightCard"),
+    leftTitle: $("leftTitle"), leftHelp: $("leftHelp"), rightTitle: $("rightTitle"), rightHelp: $("rightHelp"),
+    startError: $("startError"), analyzeButton: $("analyzeButton"), sessionInput: $("sessionInput"),
+    matterTitle: $("matterTitle"), matterMeta: $("matterMeta"), sectionNav: $("sectionNav"), sectionTitle: $("sectionTitle"),
+    sectionContent: $("sectionContent"), globalWarning: $("globalWarning"), newReviewButton: $("newReviewButton"),
+    saveSessionButton: $("saveSessionButton"), executiveExportButton: $("executiveExportButton"), detailedExportButton: $("detailedExportButton"),
+    excelExportButton: $("excelExportButton"), sourceDialog: $("sourceDialog"), sourceDialogTitle: $("sourceDialogTitle"),
+    sourceMeta: $("sourceMeta"), sourceText: $("sourceText"), closeSourceButton: $("closeSourceButton"),
+    busyLayer: $("busyLayer"), busyMessage: $("busyMessage")
+  };
+
+  const modeCopy = {
+    standalone: ["Policy and modifying documents", "Add the base policy, schedule, endorsements, riders, and amendments in controlling sequence.", "", ""],
+    "plan-policy": ["Plan documents", "Add the plan document and signed amendments in sequence.", "Stop-loss documents", "Add the policy, schedule, riders, and endorsements in sequence."],
+    renewal: ["Prior-term documents", "Add the expiring policy and its controlling modifiers.", "Renewal documents", "Add the renewal policy and its controlling modifiers."],
+    "proposal-policy": ["Proposal / quote / binder", "Add all pre-issuance materials and qualifications.", "Issued policy", "Add the final policy, schedule, and endorsements."]
+  };
+
+  function element(tag, attrs, children) {
+    const node = document.createElement(tag);
+    Object.entries(attrs || {}).forEach(([key, value]) => {
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2), value);
+      else if (value !== null && value !== undefined) node.setAttribute(key, String(value));
+    });
+    (Array.isArray(children) ? children : children == null ? [] : [children]).forEach(child => node.append(child.nodeType ? child : document.createTextNode(String(child))));
+    return node;
+  }
+
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+  function showBusy(message) { ui.busyMessage.textContent = message; ui.busyLayer.hidden = false; }
+  function hideBusy() { ui.busyLayer.hidden = true; }
+  function showError(message) { ui.startError.textContent = message; ui.startError.hidden = false; }
+  function hideError() { ui.startError.hidden = true; ui.startError.textContent = ""; }
+
+  function selectedMode() { return document.querySelector('input[name="mode"]:checked').value; }
+
+  function updateMode() {
+    state.mode = selectedMode();
+    document.querySelectorAll(".workflow-card").forEach(card => card.classList.toggle("selected", card.querySelector("input").checked));
+    const copy = modeCopy[state.mode];
+    ui.leftTitle.textContent = copy[0]; ui.leftHelp.textContent = copy[1];
+    ui.rightTitle.textContent = copy[2]; ui.rightHelp.textContent = copy[3];
+    ui.rightCard.hidden = state.mode === "standalone";
+  }
+
+  function renderFileList(input, target) {
+    clear(target);
+    Array.from(input.files || []).forEach((file, index) => target.append(element("li", { text: `${index + 1}. ${file.name} (${Math.ceil(file.size / 1024)} KB)` })));
+  }
+
+  function reconstructPdfLines(items) {
+    const lines = [];
+    items.forEach(item => {
+      const y = item.transform && item.transform[5] || 0;
+      let line = lines.find(candidate => Math.abs(candidate.y - y) < 2.5);
+      if (!line) { line = { y, items: [] }; lines.push(line); }
+      line.items.push({ x: item.transform && item.transform[4] || 0, text: item.str || "" });
+    });
+    return lines.sort((a, b) => b.y - a.y).map(line => line.items.sort((a, b) => a.x - b.x).map(x => x.text).join(" ").replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
+  }
+
+  async function readFile(file, sequence, side) {
+    const lower = file.name.toLowerCase();
+    let pages;
+    if (lower.endsWith(".pdf")) {
+      if (!globalThis.pdfjsLib) throw new Error(`${file.name}: PDF.js did not load. Check the network once, or use the manual text fallback.`);
+      globalThis.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const pdf = await globalThis.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      pages = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        pages.push({ number: pageNumber, text: reconstructPdfLines(content.items) });
+      }
+    } else if (lower.endsWith(".docx")) {
+      if (!globalThis.mammoth) throw new Error(`${file.name}: Mammoth did not load. Check the network once, or use the manual text fallback.`);
+      const result = await globalThis.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+      pages = [{ number: 1, text: result.value }];
+    } else {
+      pages = [{ number: 1, text: await file.text() }];
+    }
+    return DocumentModel.parseDocument({ id: `${side}-${sequence + 1}`, name: file.name, pages, sequence });
+  }
+
+  async function readDocumentSet(input, manual, side) {
+    const files = Array.from(input.files || []);
+    const documents = [];
+    for (let index = 0; index < files.length; index += 1) {
+      ui.busyMessage.textContent = `Reading ${files[index].name} (${index + 1} of ${files.length})`;
+      documents.push(await readFile(files[index], index, side));
+    }
+    if (manual.value.trim()) documents.push(DocumentModel.parseDocument({ id: `${side}-manual`, name: `${side === "left" ? "Document set A" : "Document set B"} manual text`, text: manual.value, sequence: documents.length }));
+    return documents;
+  }
+
+  function sessionAnalyses() {
+    return [state.leftAnalysis, state.rightAnalysis || state.analysis].filter(Boolean);
+  }
+
+  function activeAnalysis() { return state.mode === "standalone" ? state.analysis : state.rightAnalysis; }
+
+  async function analyze() {
+    hideError();
+    const needsRight = state.mode !== "standalone";
+    if (!(ui.leftFiles.files.length || ui.leftManual.value.trim())) return showError("Add at least one document or manual-text source to Document set A.");
+    if (needsRight && !(ui.rightFiles.files.length || ui.rightManual.value.trim())) return showError("This comparison mode requires at least one document or manual-text source in Document set B.");
+    showBusy("Reading documents...");
+    try {
+      const leftDocs = await readDocumentSet(ui.leftFiles, ui.leftManual, "left");
+      state.leftAnalysis = Engine.analyzeMatter(leftDocs, RuleLibrary, state.mode === "standalone" ? "standalone" : state.mode);
+      if (state.mode === "standalone") {
+        state.analysis = state.leftAnalysis;
+        state.rightAnalysis = null;
+        state.comparison = null;
+      } else {
+        const rightDocs = await readDocumentSet(ui.rightFiles, ui.rightManual, "right");
+        state.rightAnalysis = Engine.analyzeMatter(rightDocs, RuleLibrary, state.mode);
+        state.analysis = null;
+        state.comparison = Comparison.buildComparison(state.leftAnalysis, state.rightAnalysis, state.mode);
+      }
+      openWorkspace();
+    } catch (error) {
+      showError(error && error.message ? error.message : String(error));
+    } finally { hideBusy(); }
+  }
+
+  function navItems() {
+    const items = [
+      ["overview", "Overview"], ["documents", "Document health"], ["facts", "Policy at a Glance"],
+      ["findings", "Findings"], ["completeness", "Completeness"], ["hierarchy", "Hierarchy"]
+    ];
+    if (state.mode !== "standalone") items.push(["comparison", "Concept comparison"], ["financial", "Financial terms"]);
+    return items;
+  }
+
+  function openWorkspace() {
+    ui.startView.hidden = true; ui.workspaceView.hidden = false;
+    const docs = sessionAnalyses().flatMap(a => a.documents);
+    ui.matterTitle.textContent = docs[0] ? docs[0].name.replace(/\.[^.]+$/, "") : "Review workspace";
+    ui.matterMeta.textContent = `${modeCopy[state.mode][0]} | ${docs.length} document(s)`;
+    clear(ui.sectionNav);
+    navItems().forEach(([id, label]) => ui.sectionNav.append(element("button", { type: "button", text: label, "data-section": id, onclick: () => renderSection(id) })));
+    const warnings = docs.flatMap(d => d.health.unreadablePages.map(page => `${d.name}, page ${page}`));
+    ui.globalWarning.hidden = !warnings.length;
+    ui.globalWarning.textContent = warnings.length ? `Manual inspection or OCR required: ${warnings.join("; ")}. The workbench does not treat these pages as reviewed.` : "";
+    renderSection("overview");
+  }
+
+  function metric(label, value) { return element("div", { class: "metric" }, [element("strong", { text: String(value) }), element("span", { text: label })]); }
+
+  function renderOverview() {
+    const analyses = sessionAnalyses();
+    const documents = analyses.flatMap(a => a.documents);
+    const findings = analyses.flatMap(a => a.findings);
+    const uniqueFindings = new Map(findings.map(f => [f.ruleId, f]));
+    const events = analyses.flatMap(a => a.hierarchyEvents);
+    const priorities = Array.from(uniqueFindings.values()).filter(f => ["Critical", "High"].includes(f.severity)).slice(0, 12);
+    const favorable = Array.from(uniqueFindings.values()).filter(f => f.classification === "Favorable Provision");
+    const intro = state.mode === "standalone" ? state.analysis.summary.text : `${state.leftAnalysis.summary.text} ${state.rightAnalysis.summary.text} ${state.comparison.caution}`;
+    ui.sectionContent.append(
+      element("div", { class: "metric-grid" }, [metric("Documents", documents.length), metric("Current concepts", uniqueFindings.size), metric("Critical / high", priorities.length), metric("Favorable", favorable.length), metric("Hierarchy events", events.length)]),
+      element("article", { class: "card" }, [element("h3", { text: "Executive summary" }), element("p", { text: intro })]),
+      element("article", { class: "card" }, [element("h3", { text: "Top priority review leads" }), element("div", { class: "priority-list" }, priorities.length ? priorities.map(f => element("div", { class: "priority-row" }, [element("div", {}, [element("strong", { text: f.title }), element("div", { text: `${f.category} | ${f.classification}` })]), element("span", { class: `badge ${f.severity}`, text: f.severity })])) : [element("p", { text: "No critical or high-priority concepts were located in extractable text." })])]),
+      element("article", { class: "card" }, [element("h3", { text: "Required review posture" }), element("p", { text: "Every candidate is a deterministic review lead. Standalone detection does not establish a confirmed plan/policy gap. Missing indicators are reported as not located or unable to determine. Reviewer dispositions control exports." })])
+    );
+  }
+
+  function renderDocuments() {
+    const docs = sessionAnalyses().flatMap(a => a.documents);
+    const box = element("article", { class: "card" }, [element("h3", { text: "Parsing health and document model" })]);
+    const list = element("div", { class: "document-health" });
+    docs.forEach(doc => {
+      const detail = `${doc.pages.length} page(s), ${doc.clauses.length} operative clause(s), role: ${doc.role}, sequence: ${doc.sequence + 1}`;
+      const warning = doc.health.unreadablePages.length ? doc.health.warning : "All pages contained a usable amount of extractable text.";
+      list.append(element("div", { class: "health-row" }, [element("div", {}, [element("strong", { text: doc.name }), element("p", { text: detail }), element("p", { text: warning })]), element("span", { class: `badge ${doc.health.status === "Readable" ? "Low" : "High"}`, text: doc.health.status })]));
+    });
+    box.append(list); ui.sectionContent.append(box);
+  }
+
+  function findFactSource(fact) {
+    openSource({ title: fact.label, sourceDocument: fact.sourceDocument, page: fact.page, section: fact.section, hierarchyStatus: "extracted fact", operativeLanguage: fact.sourceText });
+  }
+
+  function renderFacts() {
+    const facts = sessionAnalyses().flatMap(a => a.facts);
+    const byField = new Map(); facts.forEach(f => { if (!byField.has(f.fieldId)) byField.set(f.fieldId, []); byField.get(f.fieldId).push(f); });
+    const note = element("article", { class: "card" }, [element("h3", { text: "Policy at a Glance" }), element("p", { text: "Each value retains its source and can be overridden by the reviewer without altering the extracted value." })]);
+    const grid = element("div", { class: "fact-grid" });
+    Array.from(byField.values()).flatMap(items => items).forEach(fact => {
+      const input = element("input", { class: "field-control", value: fact.reviewerValue || fact.value, "aria-label": `Reviewer value for ${fact.label}` });
+      input.addEventListener("change", () => { fact.reviewerValue = input.value; fact.reviewerStatus = "Reviewed / edited"; });
+      grid.append(element("article", { class: "fact-card" }, [element("label", { text: fact.label }), input, element("div", { class: "fact-source", text: `${fact.sourceDocument}, p. ${fact.page} | ${fact.confidence} confidence` }), element("button", { class: "source-button", type: "button", text: "View source", onclick: () => findFactSource(fact) })]));
+    });
+    if (!facts.length) grid.append(element("p", { text: "No structured fields were located in extractable text. Values were not inferred." }));
+    ui.sectionContent.append(note, grid);
+  }
+
+  function allFindings() {
+    const map = new Map();
+    sessionAnalyses().flatMap(a => a.findings).forEach(f => {
+      const key = state.mode === "standalone" ? f.ruleId : `${f.ruleId}-${f.sourceDocument}`;
+      map.set(key, f);
+    });
+    return Array.from(map.values());
+  }
+
+  function findingControls(finding) {
+    const classification = element("select", { class: "field-control" });
+    ["Potential Coverage Gap", "Confirmed Plan/Policy Difference", "Financial Limitation", "Increased Retained Risk", "Timing Risk", "Administrative Requirement", "Eligibility Risk", "Underwriting/Disclosure Risk", "Pricing/Reimbursement Limitation", "Carrier Discretion", "Contract Interpretation Risk", "Compliance Interaction", "Dispute/Enforcement Provision", "Favorable Provision", "Informational", "Requires Attorney Review"].forEach(value => classification.append(element("option", { value, text: value })));
+    classification.value = finding.classification; classification.addEventListener("change", () => finding.classification = classification.value);
+    const severity = element("select", { class: "field-control" });
+    ["Critical", "High", "Moderate", "Low", "Informational"].forEach(value => severity.append(element("option", { value, text: value })));
+    severity.value = finding.severity; severity.addEventListener("change", () => finding.severity = severity.value);
+    const disposition = element("select", { class: "field-control" });
+    ["Include", "Exclude", "Needs Review", "Confirmed", "Resolved"].forEach(value => disposition.append(element("option", { value, text: value })));
+    disposition.value = finding.disposition; disposition.addEventListener("change", () => { finding.disposition = disposition.value; finding.included = !["Exclude", "Resolved"].includes(disposition.value); });
+    return element("div", { class: "review-grid" }, [element("label", { text: "Classification" }, classification), element("label", { text: "Severity" }, severity), element("label", { text: "Disposition" }, disposition)]);
+  }
+
+  function renderFindingCard(finding) {
+    const include = element("input", { type: "checkbox", "aria-label": `Include ${finding.title}` }); include.checked = finding.included; include.addEventListener("change", () => finding.included = include.checked);
+    const detail = element("div", { class: "finding-detail" }); detail.hidden = true;
+    const toggle = element("button", { class: "quiet-button", type: "button", text: "Review", onclick: () => { detail.hidden = !detail.hidden; toggle.textContent = detail.hidden ? "Review" : "Collapse"; } });
+    const sourceList = element("div", { class: "source-list" });
+    finding.occurrences.forEach((occurrence, index) => sourceList.append(element("button", { class: "source-button", type: "button", text: `${index + 1}. ${occurrence.sourceDocument}, p. ${occurrence.page} | ${occurrence.hierarchyStatus}`, onclick: () => openSource(Object.assign({ title: finding.title }, occurrence)) })));
+    const notes = element("textarea", { class: "review-notes", placeholder: "Reviewer notes", "aria-label": `Reviewer notes for ${finding.title}` }); notes.value = finding.reviewerNotes; notes.addEventListener("input", () => finding.reviewerNotes = notes.value);
+    detail.append(
+      element("div", {}, [element("strong", { text: "Operative language" }), element("blockquote", { text: finding.exactLanguage })]),
+      element("div", {}, [element("strong", { text: "Why it matters" }), element("p", { text: finding.whyItMatters })]),
+      element("div", {}, [element("strong", { text: "Practical consequence" }), element("p", { text: finding.practicalConsequence })]),
+      element("div", {}, [element("strong", { text: "Recommended action" }), element("p", { text: finding.recommendedAction })]),
+      element("div", {}, [element("strong", { text: "Source occurrences" }), sourceList]),
+      findingControls(finding),
+      element("label", {}, [element("strong", { text: "Reviewer notes" }), notes])
+    );
+    return element("article", { class: "finding-card", "data-severity": finding.severity }, [element("div", { class: "finding-summary" }, [include, element("div", {}, [element("h3", { text: finding.title }), element("p", { text: `${finding.category} | ${finding.classification} | ${finding.confidence} confidence | ${finding.occurrences.length} occurrence(s)` })]), toggle]), detail]);
+  }
+
+  function renderFindings() {
+    const findings = allFindings();
+    const search = element("input", { type: "search", placeholder: "Search findings, categories, or source language" });
+    const severity = element("select"); severity.append(element("option", { value: "", text: "All severities" })); ["Critical", "High", "Moderate", "Low", "Informational"].forEach(x => severity.append(element("option", { value: x, text: x })));
+    const category = element("select"); category.append(element("option", { value: "", text: "All categories" })); Array.from(new Set(findings.map(f => f.category))).sort().forEach(x => category.append(element("option", { value: x, text: x })));
+    const includeAll = element("button", { class: "quiet-button", type: "button", text: "Include all", onclick: () => { findings.forEach(f => f.included = true); apply(); } });
+    const excludeAll = element("button", { class: "quiet-button", type: "button", text: "Exclude all", onclick: () => { findings.forEach(f => f.included = false); apply(); } });
+    const list = element("div", { class: "findings-list" });
+    function apply() {
+      clear(list); const q = search.value.toLowerCase().trim();
+      findings.filter(f => (!severity.value || f.severity === severity.value) && (!category.value || f.category === category.value) && (!q || `${f.title} ${f.category} ${f.exactLanguage}`.toLowerCase().includes(q))).forEach(f => list.append(renderFindingCard(f)));
+      if (!list.childElementCount) list.append(element("div", { class: "card", text: "No findings match the current filters." }));
+    }
+    search.addEventListener("input", apply); severity.addEventListener("change", apply); category.addEventListener("change", apply);
+    ui.sectionContent.append(element("div", { class: "toolbar-row" }, [search, severity, category, includeAll, excludeAll]), list); apply();
+  }
+
+  function renderCompleteness() {
+    const rows = activeAnalysis().completeness;
+    const table = element("table");
+    table.append(element("thead", {}, element("tr", {}, ["Concept", "Category", "Status", "Reason"].map(x => element("th", { text: x })))));
+    const body = element("tbody");
+    rows.forEach(row => body.append(element("tr", {}, [element("td", { text: row.concept }), element("td", { text: row.category }), element("td", { class: `status-${row.status.replace(/\s+/g, "-")}`, text: row.status }), element("td", { text: row.rationale })])));
+    table.append(body); ui.sectionContent.append(element("article", { class: "card" }, [element("h3", { text: "Material-provision completeness matrix" }), element("p", { text: "Not located is not a confirmed gap. Search indicators and extraction limits are retained in the session." })]), element("div", { class: "table-wrap" }, table));
+  }
+
+  function renderHierarchy() {
+    const events = sessionAnalyses().flatMap(a => a.hierarchyEvents);
+    const box = element("article", { class: "card" }, [element("h3", { text: "Document hierarchy and amendment events" }), element("p", { text: "The workbench marks superseded language only where a modifying clause and affected concept can be linked deterministically. Unmapped hierarchy language remains visible for attorney review." })]);
+    const list = element("div", { class: "findings-list" });
+    events.forEach(event => list.append(element("article", { class: "finding-card", "data-severity": event.confidence === "Low" ? "High" : "Moderate" }, [element("div", { class: "finding-summary" }, [element("span", { class: "badge Moderate", text: event.action }), element("div", {}, [element("h3", { text: `${event.sourceDocument}, p. ${event.page}` }), element("p", { text: `${event.affectedRuleIds.length} mapped concept(s) | ${event.confidence} confidence | ${event.rationale}` })]), element("button", { class: "source-button", type: "button", text: "View modifying clause", onclick: () => openSource({ title: "Hierarchy event", sourceDocument: event.sourceDocument, page: event.page, section: event.section, hierarchyStatus: event.action, operativeLanguage: event.modifyingLanguage }) })])])));
+    if (!events.length) list.append(element("p", { text: "No explicit hierarchy events were mapped in extractable text." }));
+    ui.sectionContent.append(box, list);
+  }
+
+  function renderComparison() {
+    const comparison = state.comparison;
+    ui.sectionContent.append(element("article", { class: "card" }, [element("h3", { text: "Concept-paired comparison" }), element("p", { text: comparison.caution })]));
+    const table = element("table");
+    table.append(element("thead", {}, element("tr", {}, ["Concept"].concat(comparison.columns).map(x => element("th", { text: x })))));
+    const body = element("tbody");
+    comparison.rows.filter(row => row.included).forEach(row => body.append(element("tr", {}, [element("td", {}, [element("strong", { text: row.concept }), element("div", { text: row.classification })]), element("td", {}, element("pre", { text: row.leftLanguage })), element("td", {}, element("pre", { text: row.rightLanguage })), element("td", { text: row.nature }), element("td", { text: row.consequence }), element("td", { text: row.recommendedAction })])));
+    table.append(body); ui.sectionContent.append(element("div", { class: "table-wrap" }, table));
+  }
+
+  function renderFinancial() {
+    const table = element("table"); table.append(element("thead", {}, element("tr", {}, ["Term", "Set A", "Set B", "Change", "Risk-transfer interpretation"].map(x => element("th", { text: x })))));
+    const body = element("tbody"); state.comparison.financialTerms.forEach(row => body.append(element("tr", {}, [element("td", { text: row.label }), element("td", { text: row.priorValue }), element("td", { text: row.currentValue }), element("td", { text: row.percentChange === null ? "Not calculated" : `${row.percentChange > 0 ? "+" : ""}${row.percentChange}%` }), element("td", { text: `${row.interpretation}${row.warning ? ` ${row.warning}` : ""}` })])));
+    table.append(body); ui.sectionContent.append(element("article", { class: "card" }, [element("h3", { text: "Financial-terms comparison" }), element("p", { text: "Premium and commission assumptions are separate from attachment-point and other retained-risk movement." })]), element("div", { class: "table-wrap" }, table));
+  }
+
+  const renderers = { overview: renderOverview, documents: renderDocuments, facts: renderFacts, findings: renderFindings, completeness: renderCompleteness, hierarchy: renderHierarchy, comparison: renderComparison, financial: renderFinancial };
+
+  function renderSection(id) {
+    state.section = id; clear(ui.sectionContent);
+    ui.sectionNav.querySelectorAll("button").forEach(button => button.classList.toggle("active", button.dataset.section === id));
+    const label = navItems().find(([key]) => key === id); ui.sectionTitle.textContent = label ? label[1] : "Review";
+    (renderers[id] || renderOverview)();
+  }
+
+  function openSource(source) {
+    ui.sourceDialogTitle.textContent = source.title || "Provision source"; clear(ui.sourceMeta);
+    [["Document", source.sourceDocument], ["Page", source.page], ["Section", source.section], ["Hierarchy", source.hierarchyStatus], ["Confidence", source.confidence], ["Trigger", source.exactTrigger]].filter(([, v]) => v !== undefined && v !== null).forEach(([term, value]) => ui.sourceMeta.append(element("dt", { text: term }), element("dd", { text: String(value) })));
+    ui.sourceText.textContent = source.operativeLanguage || source.surroundingContext || "No source text available.";
+    if (typeof ui.sourceDialog.showModal === "function") ui.sourceDialog.showModal(); else ui.sourceDialog.setAttribute("open", "");
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+  }
+
+  function saveBlob(name, type, content) {
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const link = document.createElement("a"); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  function wordDocument(detailed) {
+    const analysis = activeAnalysis();
+    const findings = allFindings().filter(f => f.included && !["Exclude", "Resolved"].includes(f.disposition));
+    const selected = detailed ? findings : findings.filter(f => ["Critical", "High"].includes(f.severity)).slice(0, 12);
+    const facts = analysis.facts.slice(0, detailed ? analysis.facts.length : 20);
+    const completeness = analysis.completeness.filter(row => detailed || ["Located", "Multiple provisions located", "Unable to determine"].includes(row.status));
+    const styles = "body{font-family:Arial,sans-serif;color:#17263a;line-height:1.45;margin:48px}h1{color:#0b2d4f;border-bottom:3px solid #1769aa;padding-bottom:8px}h2{color:#0b2d4f;margin-top:28px}table{width:100%;border-collapse:collapse;font-size:10pt}th{background:#dceaf4}th,td{border:1px solid #9fb0c0;padding:7px;vertical-align:top}.source{color:#617186;font-size:9pt}.warning{background:#fff4d8;padding:10px}";
+    const factRows = facts.map(f => `<tr><td>${escapeHtml(f.label)}</td><td>${escapeHtml(f.reviewerValue || f.value)}</td><td>${escapeHtml(f.sourceDocument)}, p. ${f.page}</td></tr>`).join("");
+    const findingBlocks = selected.map(f => `<h3>${escapeHtml(f.title)} (${escapeHtml(f.severity)})</h3><p><b>${escapeHtml(f.classification)}</b> | ${escapeHtml(f.disposition)} | ${escapeHtml(f.confidence)} confidence</p><p><b>Source:</b> ${escapeHtml(f.sourceDocument)}, p. ${f.page}, ${escapeHtml(f.section)}</p><blockquote>${escapeHtml(f.exactLanguage)}</blockquote><p><b>Why it matters:</b> ${escapeHtml(f.whyItMatters)}</p><p><b>Recommended action:</b> ${escapeHtml(f.recommendedAction)}</p>${f.reviewerNotes ? `<p><b>Reviewer notes:</b> ${escapeHtml(f.reviewerNotes)}</p>` : ""}`).join("");
+    const matrixRows = completeness.map(row => `<tr><td>${escapeHtml(row.concept)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(row.rationale)}</td></tr>`).join("");
+    const comparisonHtml = state.comparison && detailed ? `<h2>Comparison matrix</h2><table><tr><th>Concept</th><th>Set A</th><th>Set B</th><th>Difference</th><th>Action</th></tr>${state.comparison.rows.filter(r => r.included).map(r => `<tr><td>${escapeHtml(r.concept)}</td><td>${escapeHtml(r.leftLanguage)}</td><td>${escapeHtml(r.rightLanguage)}</td><td>${escapeHtml(r.nature)}</td><td>${escapeHtml(r.recommendedAction)}</td></tr>`).join("")}</table>` : "";
+    return `<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body><h1>${detailed ? "Detailed Attorney Stop-Loss Review" : "Executive Stop-Loss Review"}</h1><p>${escapeHtml(new Date().toLocaleDateString())}</p><div class="warning">Deterministic review leads only. Reviewer dispositions control this report. Not located does not mean a confirmed gap.</div><h2>Executive summary</h2><p>${escapeHtml(analysis.summary.text)}</p><h2>Policy at a Glance</h2><table><tr><th>Field</th><th>Value</th><th>Source</th></tr>${factRows}</table><h2>${detailed ? "Selected findings" : "Priority findings"}</h2>${findingBlocks || "<p>No included findings met this report's selection criteria.</p>"}<h2>Completeness matrix</h2><table><tr><th>Concept</th><th>Status</th><th>Reason</th></tr>${matrixRows}</table>${comparisonHtml}<p class="source">Generated locally by Stop-Loss Policy Review Workbench v16.0.0. This report does not replace attorney judgment.</p></body></html>`;
+  }
+
+  function exportWord(detailed) { saveBlob(detailed ? "stop-loss-detailed-attorney-review.doc" : "stop-loss-executive-review.doc", "application/msword;charset=utf-8", wordDocument(detailed)); }
+
+  function tsvCell(value) { return String(value == null ? "" : value).replace(/\t/g, " ").replace(/\r?\n/g, " "); }
+
+  function exportExcel() {
+    let rows;
+    if (state.comparison) rows = [["Concept", "Category", "Set A Language", "Set B Language", "Difference", "Consequence", "Recommended Action", "Classification", "Severity", "Disposition"]].concat(state.comparison.rows.map(r => [r.concept, r.category, r.leftLanguage, r.rightLanguage, r.nature, r.consequence, r.recommendedAction, r.classification, r.severity, r.disposition]));
+    else rows = [["Rule ID", "Title", "Category", "Classification", "Severity", "Confidence", "Document", "Page", "Section", "Hierarchy", "Exact Language", "Why It Matters", "Recommended Action", "Disposition", "Reviewer Notes"]].concat(state.analysis.findings.map(f => [f.ruleId, f.title, f.category, f.classification, f.severity, f.confidence, f.sourceDocument, f.page, f.section, f.hierarchyStatus, f.exactLanguage, f.whyItMatters, f.recommendedAction, f.disposition, f.reviewerNotes]));
+    saveBlob("stop-loss-review-matrix.xls", "application/vnd.ms-excel;charset=utf-8", "\ufeff" + rows.map(row => row.map(tsvCell).join("\t")).join("\n"));
+  }
+
+  function saveSession() {
+    const payload = { schemaVersion: "1.0.0", appVersion: "16.0.0", savedAt: new Date().toISOString(), mode: state.mode, leftAnalysis: state.leftAnalysis, rightAnalysis: state.rightAnalysis, analysis: state.analysis, comparison: state.comparison };
+    saveBlob("stop-loss-review-session.json", "application/json;charset=utf-8", JSON.stringify(payload, null, 2));
+  }
+
+  async function openSession(file) {
+    try {
+      const payload = JSON.parse(await file.text());
+      if (payload.schemaVersion !== "1.0.0" || !payload.mode) throw new Error("Unsupported or invalid session schema.");
+      state.mode = payload.mode; state.leftAnalysis = payload.leftAnalysis; state.rightAnalysis = payload.rightAnalysis; state.analysis = payload.analysis; state.comparison = payload.comparison;
+      const radio = document.querySelector(`input[name="mode"][value="${CSS.escape(state.mode)}"]`); if (radio) radio.checked = true; updateMode(); openWorkspace();
+    } catch (error) { showError(`Could not open session: ${error.message || error}`); }
+  }
+
+  function newReview() {
+    state.leftAnalysis = state.rightAnalysis = state.analysis = state.comparison = null;
+    ui.workspaceView.hidden = true; ui.startView.hidden = false; ui.leftFiles.value = ""; ui.rightFiles.value = ""; ui.leftManual.value = ""; ui.rightManual.value = ""; clear(ui.leftFileList); clear(ui.rightFileList); hideError();
+  }
+
+  ui.workflowGrid.addEventListener("change", updateMode);
+  ui.leftFiles.addEventListener("change", () => renderFileList(ui.leftFiles, ui.leftFileList));
+  ui.rightFiles.addEventListener("change", () => renderFileList(ui.rightFiles, ui.rightFileList));
+  ui.analyzeButton.addEventListener("click", analyze);
+  ui.sessionInput.addEventListener("change", () => ui.sessionInput.files[0] && openSession(ui.sessionInput.files[0]));
+  ui.newReviewButton.addEventListener("click", newReview);
+  ui.saveSessionButton.addEventListener("click", saveSession);
+  ui.executiveExportButton.addEventListener("click", () => exportWord(false));
+  ui.detailedExportButton.addEventListener("click", () => exportWord(true));
+  ui.excelExportButton.addEventListener("click", exportExcel);
+  ui.closeSourceButton.addEventListener("click", () => ui.sourceDialog.close());
+  updateMode();
+})();
+
+</script>
+</body>
+</html>

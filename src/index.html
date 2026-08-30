@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Stop-Loss Policy Review Workbench</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Local-first contract analysis</p>
+      <h1>Stop-Loss Policy Review Workbench</h1>
+    </div>
+    <div class="version-badge">v16.0.0 <span>Rules 1.0.0</span></div>
+  </header>
+
+  <main>
+    <section id="startView" class="start-view">
+      <div class="hero panel">
+        <div>
+          <p class="kicker">Deterministic, clause-first review</p>
+          <h2>Choose the legal review workflow</h2>
+          <p>The workbench preserves clause provenance, applies document hierarchy, pairs concepts across documents, and leaves every exported conclusion under reviewer control.</p>
+        </div>
+        <div class="privacy-note"><strong>Privacy:</strong> Policy files stay in this browser. The workbench includes no telemetry and makes no generative-AI calls.</div>
+      </div>
+
+      <fieldset class="workflow-grid panel" id="workflowGrid">
+        <legend>Review mode</legend>
+        <label class="workflow-card selected"><input type="radio" name="mode" value="standalone" checked><span><strong>Standalone policy</strong><small>Policy at a Glance, hierarchy, findings, favorable terms, completeness</small></span></label>
+        <label class="workflow-card"><input type="radio" name="mode" value="plan-policy"><span><strong>Plan vs. stop-loss</strong><small>Concept-paired plan and reimbursement comparison</small></span></label>
+        <label class="workflow-card"><input type="radio" name="mode" value="renewal"><span><strong>Prior vs. renewal</strong><small>Risk-transfer, financial-term, deadline, and clause changes</small></span></label>
+        <label class="workflow-card"><input type="radio" name="mode" value="proposal-policy"><span><strong>Proposal vs. issued policy</strong><small>Promised features, qualifications, and final contract terms</small></span></label>
+      </fieldset>
+
+      <section class="upload-grid panel">
+        <article class="upload-card">
+          <div>
+            <p class="step">Document set A</p>
+            <h3 id="leftTitle">Policy and modifying documents</h3>
+            <p id="leftHelp">Add the base policy, schedule, endorsements, riders, and amendments in controlling sequence.</p>
+          </div>
+          <label class="drop-zone">Choose PDF, DOCX, or TXT files<input id="leftFiles" type="file" multiple accept=".pdf,.docx,.txt,.text"></label>
+          <ol id="leftFileList" class="file-list"></ol>
+          <details><summary>Manual text fallback</summary><textarea id="leftManual" rows="6" placeholder="Paste extractable policy text here. Use [[PAGE BREAK]] between pages when useful."></textarea></details>
+        </article>
+        <article class="upload-card" id="rightCard" hidden>
+          <div>
+            <p class="step">Document set B</p>
+            <h3 id="rightTitle">Comparison documents</h3>
+            <p id="rightHelp">Add the corresponding document and modifiers.</p>
+          </div>
+          <label class="drop-zone">Choose PDF, DOCX, or TXT files<input id="rightFiles" type="file" multiple accept=".pdf,.docx,.txt,.text"></label>
+          <ol id="rightFileList" class="file-list"></ol>
+          <details><summary>Manual text fallback</summary><textarea id="rightManual" rows="6" placeholder="Paste comparison text here."></textarea></details>
+        </article>
+      </section>
+
+      <div id="startError" class="alert error" role="alert" hidden></div>
+      <div class="start-actions">
+        <label class="secondary-button">Open saved session<input id="sessionInput" type="file" accept=".json,application/json"></label>
+        <button id="analyzeButton" class="primary-button">Build review workspace</button>
+      </div>
+    </section>
+
+    <section id="workspaceView" class="workspace" hidden>
+      <aside class="sidebar">
+        <div class="matter-head">
+          <p class="eyebrow">Current matter</p>
+          <h2 id="matterTitle">Review workspace</h2>
+          <p id="matterMeta"></p>
+        </div>
+        <nav id="sectionNav" aria-label="Review sections"></nav>
+        <div class="sidebar-actions">
+          <button id="newReviewButton" class="quiet-button">New review</button>
+          <button id="saveSessionButton" class="quiet-button">Save session JSON</button>
+        </div>
+      </aside>
+
+      <div class="workspace-main">
+        <div class="workspace-toolbar">
+          <div>
+            <p class="kicker">Attorney-controlled output</p>
+            <h2 id="sectionTitle">Overview</h2>
+          </div>
+          <div class="export-menu">
+            <button id="executiveExportButton" class="secondary-button">Executive Word</button>
+            <button id="detailedExportButton" class="secondary-button">Detailed Word</button>
+            <button id="excelExportButton" class="secondary-button">Excel matrix</button>
+          </div>
+        </div>
+        <div id="globalWarning" class="alert warning" hidden></div>
+        <section id="sectionContent" class="section-content" aria-live="polite"></section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="sourceDialog">
+    <div class="dialog-head"><div><p class="eyebrow">Source viewer</p><h2 id="sourceDialogTitle">Provision source</h2></div><button id="closeSourceButton" class="quiet-button" aria-label="Close source viewer">Close</button></div>
+    <dl id="sourceMeta" class="source-meta"></dl>
+    <pre id="sourceText" class="source-text"></pre>
+  </dialog>
+
+  <div id="busyLayer" class="busy-layer" hidden><div class="busy-card"><span class="spinner"></span><strong id="busyMessage">Reading documents...</strong></div></div>
+
+  <script src="../rules/rule-library.js"></script>
+  <script src="parsing/document-model.js"></script>
+  <script src="analysis/workbench-engine.js"></script>
+  <script src="comparison/comparison-engine.js"></script>
+  <script src="ui/app.js"></script>
+</body>
+</html>
