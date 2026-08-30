@@ -6,9 +6,11 @@ Canonical repository: `to-shreds/Policy-review`
 
 Branch: `main`
 
-Baseline archive commit: `90b9196`
+Baseline archive commit: `bc7a3450be6895b4a0b915abec50588c1856036d`
 
-Implementation commit: `54730ea`
+Implementation commit: `345606d51390e88905d98e4fa1f1c001ae248921`
+
+Initial release-documentation commit: `61a97af9913ca922b85c9e35f7600add3ff4d298`
 
 ## Baseline verification
 
